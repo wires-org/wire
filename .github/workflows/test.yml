@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: https://github.com/cachix/install-nix-action@v27
+    - uses: cachix/install-nix-action@v27
       with:
         nix_path: nixpkgs=channel:nixos-unstable
-    - uses: https://github.com/cachix/cachix-action@v14
+    - uses: cachix/cachix-action@v14
       with:
         name: wires
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'

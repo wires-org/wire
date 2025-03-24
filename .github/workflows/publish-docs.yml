@@ -11,16 +11,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: https://github.com/cachix/install-nix-action@v27
+    - uses: cachix/install-nix-action@v27
       with:
         nix_path: nixpkgs=channel:nixos-unstable
-    - uses: https://github.com/cachix/cachix-action@v14
+    - uses: cachix/cachix-action@v14
       with:
         name: wires
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix build .#docs
     - name: Publish
-      uses: https://github.com/cloudflare/pages-action@v1
+      uses: cloudflare/pages-action@v1
       with:
         apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         accountId: b300aa9feadcc6f9a3d855959d3287ed
