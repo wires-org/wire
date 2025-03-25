@@ -7,8 +7,8 @@ jobs:
     runs-on: native
     strategy:
       matrix:
-        # check: [pre-commit-check, nixos-tests]
-        check: [pre-commit-check]
+        # check: [pre-commit, nixos-tests]
+        check: [pre-commit]
     timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
