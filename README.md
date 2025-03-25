@@ -19,7 +19,7 @@ wire
 │  └── an [mdBook](https://rust-lang.github.io/mdBook/)
 ├── runtime
 │  └── Nix files used during runtime to evaluate nodes
-├── intergration-testing
+├── integration-testing
 │  └── Integration tests using nixos tests
 └──tests
    └── Directories used during cargo tests

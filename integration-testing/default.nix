@@ -90,7 +90,7 @@ in
 
       deployer.wait_until_succeeds("ssh -o StrictHostKeyChecking=accept-new node true", timeout=30)
 
-      deployer.succeed("wire apply switch --no-progress -vv --no-keys --path ${../.}/intergration-testing/")
+      deployer.succeed("wire apply switch --no-progress -vv --no-keys --path ${../.}/integration-testing/")
 
       # node.succeed("stat /etc/post-switch")
     '';
