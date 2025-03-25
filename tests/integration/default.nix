@@ -1,56 +1,65 @@
 {
-  wire ? (import ../default.nix).flake.outputs.packages.x86_64-linux.wire,
+  flake,
+  wire ? (import "${flake}").flake.outputs.packages.x86_64-linux.wire,
   pkgs ? (import ./nixpkgs.nix),
   ...
-}: let
+}:
+let
   inherit (pkgs) lib;
   sshKeys = import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs;
 
-  commonModule = {pkgs, ...}: {
-    nix.nixPath = ["nixpkgs=${pkgs.path}"];
-    nix.settings.substituters = lib.mkForce [];
-    virtualisation = {
-      memorySize = lib.mkForce (1024 * 5);
-      writableStore = true;
-      additionalPaths = [
-        pkgs.path
-        (getPrebuiltNode "node")
-        (import ../default.nix).tarball
-        (import ../default.nix).flake.inputs.nixpkgs.outPath
-        ./..
+  commonModule =
+    { pkgs, ... }:
+    {
+      nix.nixPath = [ "nixpkgs=${pkgs.path}" ];
+      nix.settings.substituters = lib.mkForce [ ];
+      virtualisation = {
+        memorySize = lib.mkForce (1024 * 5);
+        writableStore = true;
+        additionalPaths = [
+          pkgs.path
+          (getPrebuiltNode "node")
+          (import "${flake}").tarball
+          (import "${flake}").flake.inputs.nixpkgs.outPath
+          ./..
+        ];
+      };
+
+      services.openssh.enable = true;
+      users.users.root.openssh.authorizedKeys.keys = [
+        sshKeys.snakeOilPublicKey
+      ];
+
+      boot.loader.grub.enable = false;
+    };
+
+  deployerModule =
+    { pkgs, ... }:
+    {
+      imports = [ commonModule ];
+      environment.systemPackages = [
+        wire
+        pkgs.git
+        (pkgs.writeShellScriptBin "run-copy-stderr" ''
+          exec "$@" 2>&1
+        '')
       ];
     };
 
-    services.openssh.enable = true;
-    users.users.root.openssh.authorizedKeys.keys = [
-      sshKeys.snakeOilPublicKey
-    ];
-
-    boot.loader.grub.enable = false;
-  };
-
-  deployerModule = {pkgs, ...}: {
-    imports = [commonModule];
-    environment.systemPackages = [
-      wire
-      pkgs.git
-      (pkgs.writeShellScriptBin "run-copy-stderr" ''
-        exec "$@" 2>&1
-      '')
-    ];
-  };
-
-  targetModule = {...}: {
-    imports = [commonModule];
-    system.switch.enable = true;
-  };
+  targetModule =
+    { ... }:
+    {
+      imports = [ commonModule ];
+      system.switch.enable = true;
+    };
 
   nodes = {
     deployer = deployerModule;
     node = targetModule;
   };
 
-  evalTest = module:
+  evalTest =
+    module:
     pkgs.testers.runNixOSTest {
       inherit nodes;
       name = "deployer";
@@ -61,18 +70,20 @@
       ];
     };
 
-  evaluate = import ../runtime/evaluate.nix;
-  getPrebuiltNode = name:
+  evaluate = import "${flake}/runtime/evaluate.nix";
+  getPrebuiltNode =
+    name:
     (evaluate {
       hive = import ./hive.nix;
       path = ./.;
-      nixosConfigurations = {};
+      nixosConfigurations = { };
       nixpkgs = pkgs;
-    })
-    .getTopLevel
-    name;
+    }).getTopLevel
+      name;
 in
-  evalTest ({pkgs, ...}: {
+evalTest (
+  { pkgs, ... }:
+  {
     testScript = _: ''
       start_all()
 
@@ -90,8 +101,9 @@ in
 
       deployer.wait_until_succeeds("ssh -o StrictHostKeyChecking=accept-new node true", timeout=30)
 
-      deployer.succeed("wire apply switch --no-progress -vv --no-keys --path ${../.}/integration-testing/")
+      deployer.succeed("wire apply switch --no-progress -vv --no-keys --path ${flake}/tests/integration")
 
       # node.succeed("stat /etc/post-switch")
     '';
-  })
+  }
+)
