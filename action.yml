@@ -1,0 +1,18 @@
+name: wire
+inputs:
+  hive:
+    description: "path to directory containing"
+    required: true
+    default: "."
+outputs:
+  all-nodes:
+    description: "json list of all nodes within the hive"
+    value: ${{ steps.nodes.outputs.all-nodes }}
+runs:
+  using: "composite"
+  steps:
+    - id: nodes
+      working-directory: ${{ inputs.hive }}
+      run: |
+        nix build $GITHUB_ACTION_PATH#wire --extra-trusted-substituters "https://wires.cachix.org" --extra-trusted-public-keys "wires.cachix.org-1:7XQoG91Bh+Aj01mAJi77Ui5AYyM1uEyV0h1wOomqjpk=" -vv --print-build-logs
+        echo "all-nodes=$(./bin/wire inspect --json | nix run nixpkgs#jq -- -c ".nodes | keys")" >> $GITHUB_OUTPUT
