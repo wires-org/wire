@@ -1,4 +1,4 @@
-name: "Build Packages"
+name: "test-golf"
 on:
   pull_request:
   push:
@@ -10,6 +10,4 @@ jobs:
     - uses: cachix/install-nix-action@v27
     - name: get
       uses: ./
-      with:
-        hive: 'ryo/'
     - run: nix --help
