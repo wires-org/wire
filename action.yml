@@ -12,6 +12,7 @@ runs:
   using: "composite"
   steps:
     - id: nodes
+      shell: bash
       working-directory: ${{ inputs.hive }}
       run: |
         nix build $GITHUB_ACTION_PATH#wire --extra-trusted-substituters "https://wires.cachix.org" --extra-trusted-public-keys "wires.cachix.org-1:7XQoG91Bh+Aj01mAJi77Ui5AYyM1uEyV0h1wOomqjpk=" -vv --print-build-logs
