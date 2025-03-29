@@ -33,12 +33,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-base:
+  eval-base:
     runs-on: ubuntu-latest
     needs: base-ref
 
     outputs:
-      path: ${{ steps.path.outputs.path }}
+      drv: ${{ steps.drv.outputs.drv }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,15 +51,15 @@ jobs:
         with:
           name: wires
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      - id: path
-        run: echo "path=$(nix build .#docs --print-out-paths)" >> "$GITHUB_OUTPUT"
+      - id: drv
+        run: echo "drv=$(nix eval .#docs --json)" >> "$GITHUB_OUTPUT"
 
-  build-head:
+  eval-head:
     runs-on: ubuntu-latest
     needs: get-pr
 
     outputs:
-      path: ${{ steps.path.outputs.path }}
+      drv: ${{ steps.drv.outputs.drv }}
 
     if: ${{ needs.get-pr.outputs.number != '' }}
 
@@ -72,15 +72,15 @@ jobs:
         with:
           name: wires
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      - id: path
-        run: echo "path=$(nix build .#docs --print-out-paths)" >> "$GITHUB_OUTPUT"          
+      - id: drv
+        run: echo "drv=$(nix eval .#docs --json)" >> "$GITHUB_OUTPUT"          
 
   deploy:
     runs-on: ubuntu-latest
 
     needs:
-      - build-head
-      - build-base
+      - eval-head
+      - eval-base
       - get-pr
 
     environment: 
@@ -88,7 +88,7 @@ jobs:
       url: https://pr-${{ needs.get-pr.outputs.number }}.wire-docs.pages.dev/
     
     # skip if nothing changed in the docs package
-    if: needs.build-head.outputs.path != needs.build-base.outputs.path
+    if: needs.eval-head.outputs.drv != needs.eval-base.outputs.drv
 
     steps:
       - uses: actions/checkout@v4
