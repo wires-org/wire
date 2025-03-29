@@ -10,7 +10,7 @@ name = "wire"
 [workspace.dependencies]
 clap = { version = "4.5.9", features = ["derive", "string"] }
 clap-verbosity-flag = "2.2.0"
-serde = { version = "1.0.204", features = ["derive", "rc"] }
+serde = { version = "1.0.219", features = ["derive", "rc"] }
 serde_json = { version = "1.0.120" }
 tokio = { version = "1.38.0", features = ["full"] }
 tracing = "0.1.40"
