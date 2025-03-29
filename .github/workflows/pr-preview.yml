@@ -36,6 +36,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
+            console.log(pr);
 
             return pr.data.base.ref;
 
