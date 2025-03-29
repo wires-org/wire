@@ -8,22 +8,87 @@ jobs:
 
     outputs:
       number: ${{ steps.find-pr.outputs.number }}
+      base_ref: ${{ steps.base-ref.outputs.base_ref }}
 
     steps:
       - uses: jwalton/gh-find-current-pr@master
         id: find-pr
         with:
           state: all
+      - name: Locate Base Ref
+        id: base-ref
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const pr = await github.rest.issues.get({
+              issue_number: ${{ steps.find-pr.outputs.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            return pr.data.base.ref;
+
+  build-base:
+    runs-on: ubuntu-latest
+    needs: check
+
+    if: ${{ needs.check.outputs.number != '' }}
+
+    outputs:
+      path: ${{ steps.path.outputs.path }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.base_ref }}
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: cachix/cachix-action@v14
+        with:
+          name: wires
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - run: nix build .#docs --print-out-paths
+      - id: path
+        run: echo "path=$(nix build .#docs --print-out-paths)" >> "$GITHUB_OUTPUT"
+
+  build-head:
+    runs-on: ubuntu-latest
+    needs: check
+
+    if: ${{ needs.check.outputs.number != '' }}
+
+    outputs:
+      path: ${{ steps.path.outputs.path }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: cachix/cachix-action@v14
+        with:
+          name: wires
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - run: nix build .#docs --print-out-paths
+      - id: path
+        run: echo "path=$(nix build .#docs --print-out-paths)" >> "$GITHUB_OUTPUT"          
 
   deploy:
     runs-on: ubuntu-latest
-    needs: check
+
+    needs:
+      - build-head
+      - build-base
+      - check
 
     environment: 
       name: preview
       url: https://pr-${{ needs.check.outputs.number }}.wire-docs.pages.dev/
-
-    if: ${{ needs.check.outputs.number != '' }}
+    
+    # skip if nothing changed in the docs package
+    if: needs.build-head.outputs.path != needs.build-base.outputs.path
 
     steps:
       - uses: actions/checkout@v4
