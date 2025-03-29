@@ -3,18 +3,28 @@ on:
   push:
 
 jobs:
-  check:
+  get-pr:
     runs-on: ubuntu-latest
 
     outputs:
       number: ${{ steps.find-pr.outputs.number }}
-      base_ref: ${{ steps.base-ref.outputs.base_ref }}
 
     steps:
       - uses: jwalton/gh-find-current-pr@master
         id: find-pr
         with:
           state: all
+
+  base-ref:
+    runs-on: ubuntu-latest
+    needs: get-pr
+
+    outputs:
+      base_ref: ${{ steps.base-ref.outputs.base_ref }}
+
+    if: ${{ needs.get-pr.outputs.number != '' }}
+
+    steps:
       - name: Locate Base Ref
         id: base-ref
         uses: actions/github-script@v7
@@ -22,7 +32,7 @@ jobs:
           result-encoding: string
           script: |
             const pr = await github.rest.issues.get({
-              issue_number: ${{ steps.find-pr.outputs.number }},
+              issue_number: ${{ needs.check.outputs.number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
@@ -31,9 +41,7 @@ jobs:
 
   build-base:
     runs-on: ubuntu-latest
-    needs: check
-
-    if: ${{ needs.check.outputs.number != '' }}
+    needs: base-ref
 
     outputs:
       path: ${{ steps.path.outputs.path }}
@@ -55,9 +63,6 @@ jobs:
 
   build-head:
     runs-on: ubuntu-latest
-    needs: check
-
-    if: ${{ needs.check.outputs.number != '' }}
 
     outputs:
       path: ${{ steps.path.outputs.path }}
@@ -81,11 +86,11 @@ jobs:
     needs:
       - build-head
       - build-base
-      - check
+      - get-pr
 
     environment: 
       name: preview
-      url: https://pr-${{ needs.check.outputs.number }}.wire-docs.pages.dev/
+      url: https://pr-${{ needs.get-pr.outputs.number }}.wire-docs.pages.dev/
     
     # skip if nothing changed in the docs package
     if: needs.build-head.outputs.path != needs.build-base.outputs.path
@@ -106,4 +111,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy ./result/ --project-name wire-docs --branch pr-${{ needs.check.outputs.number }}
+          command: pages deploy ./result/ --project-name wire-docs --branch pr-${{ needs.get-pr.outputs.number }}
