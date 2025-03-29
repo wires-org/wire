@@ -25,20 +25,13 @@ jobs:
     if: ${{ needs.get-pr.outputs.number != '' }}
 
     steps:
+      - run: sudo apt install -y jq
       - name: Locate Base Ref
         id: base-ref
-        uses: actions/github-script@v7
-        with:
-          result-encoding: string
-          script: |
-            const pr = await github.rest.issues.get({
-              issue_number: ${{ needs.get-pr.outputs.number }},
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            });
-            console.log(pr);
-
-            return pr.data.base.ref;
+        run: |
+          echo "base-ref=$(gh api /repos/${{ github.repository }}/pulls/${{ needs.get-pr.outputs.number }} | jq -r '.data.ref')" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-base:
     runs-on: ubuntu-latest
