@@ -12,6 +12,7 @@
   };
   outputs =
     {
+      self,
       flake-parts,
       systems,
       git-hooks,
@@ -30,6 +31,7 @@
         ./wire/cli
         ./wire/key_agent
         ./doc
+        ./tests/nix
       ];
       systems = import systems;
 
@@ -44,6 +46,7 @@
           _module.args = {
             toolchain = inputs'.fenix.packages.complete;
             craneLib = (crane.mkLib pkgs).overrideToolchain config._module.args.toolchain.toolchain;
+            inherit self;
           };
           treefmt = {
             programs = {
