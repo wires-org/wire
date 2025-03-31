@@ -28,24 +28,6 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - name: Build
         run: nix develop --print-build-logs -v --command pre-commit run --all-files
-  # flake-checks:
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       check: [treefmt]
-  #   needs: pre-job
-  #   if: needs.pre-job.outputs.should_skip != 'true'
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: cachix/install-nix-action@v31
-  #       with:
-  #         nix_path: nixpkgs=channel:nixos-unstable
-  #     - uses: cachix/cachix-action@v16
-  #       with:
-  #         name: wires
-  #         authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-  #     - name: Build
-  #       run: nix build .#checks.x86_64-linux.${{ matrix.check }} --print-build-logs
   nextest:
     runs-on: ubuntu-latest
     needs: pre-job
@@ -68,3 +50,42 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - name: Nextest
         run: nix develop --print-build-logs -v --command cargo nextest run
+  find-vm-tests:
+    runs-on: ubuntu-latest
+    needs: pre-job
+    if: needs.pre-job.outputs.should_skip != 'true'
+    outputs:
+      tests: ${{ steps.find-tests.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: cachix/cachix-action@v16
+        with:
+          name: wires
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: find-tests
+        id: tests
+        run: |
+          echo "tests=$(
+            nix eval --impure --json --expr \
+            'with builtins; filter ((import <nixpkgs>{}).lib.hasPrefix "nixos-vm-test") (attrNames (getFlake "${{ github.workspace }}").checks.x86_64-darwin)'
+          )" >> "$GITHUB_OUTPUT"
+  vm-tests:
+    runs-on: ubuntu-latest
+    needs: find-vm-tests
+    strategy:
+      matrix:
+        test: ${{ fromJSON(needs.find-vm-tests.outputs.tests) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - uses: cachix/cachix-action@v16
+        with:
+          name: wires
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: Build
+        run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure
