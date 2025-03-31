@@ -100,4 +100,4 @@ jobs:
           name: wires
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - name: Build
-        run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure --store .build/store
+        run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure --store ./.build/store
