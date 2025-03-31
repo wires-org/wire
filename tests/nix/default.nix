@@ -2,6 +2,7 @@
   self,
   config,
   lib,
+  inputs,
   ...
 }:
 let
@@ -18,25 +19,34 @@ in
 {
   imports = [ ./suite/test_basic_deploy ];
   options.wire.testing = mkOption {
-    type = attrsOf (submodule {
-      options = {
-        nodes = mkOption {
-          type = lazyAttrsOf deferredModule;
-        };
-        testScript = mkOption {
-          type = lines;
-          default = ''
+    type = attrsOf (
+      submodule (
+        { name, ... }:
+        {
+          options = {
+            nodes = mkOption {
+              type = lazyAttrsOf deferredModule;
+            };
+            testScript = mkOption {
+              type = lines;
+              default = ''
 
-          '';
-          description = "test script for runNixOSTest";
-        };
-      };
-      config = {
-        testScript = ''
-          start_all()
-        '';
-      };
-    });
+              '';
+              description = "test script for runNixOSTest";
+            };
+            testDir = mkOption {
+              default = "${self}/tests/nix/suite/${name}";
+              readOnly = true;
+            };
+          };
+          config = {
+            testScript = ''
+              start_all()
+            '';
+          };
+        }
+      )
+    );
     description = "A set of test cases for wire VM testing suite";
   };
 
@@ -64,7 +74,10 @@ in
               hive = evaluateHive {
                 nixpkgs = pkgs.path;
                 path = testDir;
-                hive = import "${testDir}/hive.nix";
+                hive = builtins.scopedImport {
+                  __nixPath = _b: null;
+                  __findFile = path: name: if name == "nixpkgs" then pkgs.path else throw "oops!!";
+                } "${testDir}/hive.nix";
               };
               nodes = mapAttrsToList (_: val: val.config.system.build.toplevel.drvPath) hive.nodes;
             in
@@ -75,15 +88,20 @@ in
                 settings.substituters = lib.mkForce [ ];
               };
 
-              virtualisation.additionalPaths = nodes;
+              virtualisation.memorySize = 4096;
+
+              virtualisation.additionalPaths = nodes ++ [
+                inputs.nixpkgs.outPath
+                inputs.self.outPath
+              ];
 
             };
           node.specialArgs = {
             evaluateHive = import "${self}/runtime/evaluate.nix";
             suiteDir = "${self}/tests/nix";
             inherit testName;
-            testDir = "${self}/tests/nix/suite/${testName}";
             snakeOil = import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs;
+            inherit (opts) testDir;
             inherit (self'.packages) wire;
           };
           inherit (opts) testScript;
