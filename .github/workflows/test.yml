@@ -99,5 +99,8 @@ jobs:
         with:
           name: wires
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - run: |
+          mkdir -p ./.store/nix/store
+          chmod -R 0777 ./.store
       - name: Build
-        run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure --store ./.build/store
+        run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure --store ./.store
