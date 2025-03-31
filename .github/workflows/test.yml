@@ -101,6 +101,10 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - run: |
           mkdir -p ./.store/nix/store
+          mkdir -p ./.tmp
           chmod -R 0777 ./.store
+          chmod -R 0777 ./.tmp
       - name: Build
         run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure --store ./.store
+        env:
+          TMPDIR: "./.tmp"
