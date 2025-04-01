@@ -5,7 +5,7 @@ on:
 jobs:
   pre-job:
     continue-on-error: true
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
@@ -14,7 +14,7 @@ jobs:
         with:
           concurrent_skipping: "same_content_newer"
   pre-commit:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: pre-job
     if: needs.pre-job.outputs.should_skip != 'true'
     steps:
@@ -29,7 +29,7 @@ jobs:
       - name: Build
         run: nix develop --print-build-logs -v --command pre-commit run --all-files
   nextest:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: pre-job
     if: needs.pre-job.outputs.should_skip != 'true'
     steps:
@@ -51,9 +51,9 @@ jobs:
       - name: Nextest
         run: nix develop --print-build-logs -v --command cargo nextest run
   find-vm-tests:
-    runs-on: self-hosted
-    # needs: pre-job
-    # if: needs.pre-job.outputs.should_skip != 'true'
+    runs-on: ubuntu-latest
+    needs: pre-job
+    if: needs.pre-job.outputs.should_skip != 'true'
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
     steps:
@@ -79,22 +79,7 @@ jobs:
       matrix:
         test: ${{ fromJSON(needs.find-vm-tests.outputs.tests) }}
     steps:
-      - run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          enable_kvm: true
-          extra_nix_config: "system-features = nixos-test benchmark big-parallel kvm"
-      - uses: cachix/cachix-action@v16
-        with:
-          name: wires
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - uses: actions/checkout@v5
       - name: Build
         timeout-minutes: 20
         run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure
