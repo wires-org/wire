@@ -79,7 +79,7 @@ jobs:
       matrix:
         test: ${{ fromJSON(needs.find-vm-tests.outputs.tests) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
       - name: Build
         timeout-minutes: 20
         run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure
