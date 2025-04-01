@@ -52,8 +52,8 @@ jobs:
         run: nix develop --print-build-logs -v --command cargo nextest run
   find-vm-tests:
     runs-on: ubuntu-latest
-    needs: pre-job
-    if: needs.pre-job.outputs.should_skip != 'true'
+    # needs: pre-job
+    # if: needs.pre-job.outputs.should_skip != 'true'
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
     steps:
@@ -79,16 +79,22 @@ jobs:
       matrix:
         test: ${{ fromJSON(needs.find-vm-tests.outputs.tests) }}
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 512
-          swap-size-mb: 1024
-          remove-dotnet: "true"
-          remove-android: "true"
-          remove-haskell: "true"
-          remove-codeql: "true"
-          remove-docker-images: "true"
+      # - name: Maximize build space
+      #   uses: easimon/maximize-build-space@master
+      #   with:
+      #     root-reserve-mb: 512
+      #     swap-size-mb: 1024
+      #     remove-dotnet: "true"
+      #     remove-android: "true"
+      #     remove-haskell: "true"
+      #     remove-codeql: "true"
+      #     remove-docker-images: "true"
+      - run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
         with:
@@ -99,12 +105,12 @@ jobs:
         with:
           name: wires
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-      - run: |
-          mkdir -p ./.store/nix/store
-          mkdir -p ./.tmp
-          chmod -R 0777 ./.store
-          chmod -R 0777 ./.tmp
+      # - run: |
+      #     mkdir -p ./.store/nix/store
+      #     mkdir -p ./.tmp
+      #     chmod -R 0777 ./.store
+      #     chmod -R 0777 ./.tmp
       - name: Build
-        run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure --store ./.store
-        env:
-          TMPDIR: "./.tmp"
+        run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure
+        # env:
+        #   TMPDIR: "./.tmp"
