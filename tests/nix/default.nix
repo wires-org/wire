@@ -87,12 +87,7 @@ in
                 settings.substituters = lib.mkForce [ ];
               };
 
-              virtualisation = {
-                memorySize = 4096;
-                writableStore = true;
-                useNixStoreImage = true;
-                writableStoreUseTmpfs = true;
-              };
+              virtualisation.memorySize = 4096;
 
               virtualisation.additionalPaths = nodes ++ [
                 inputs.nixpkgs.outPath
@@ -105,7 +100,6 @@ in
             inherit testName;
             snakeOil = import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs;
             inherit (opts) testDir;
-
             inherit (self'.packages) wire;
           };
           inherit (opts) testScript;

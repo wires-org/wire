@@ -29,8 +29,7 @@ in
     (mkIf cfg.receiver {
       services.openssh.enable = true;
       users.users.root.openssh.authorizedKeys.keys = [ snakeOil.snakeOilEd25519PublicKey ];
-
-      boot.loader.grub.enable = false;
+      system.switch.enable = true;
     })
   ];
 }
