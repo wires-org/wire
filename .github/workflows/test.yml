@@ -79,16 +79,6 @@ jobs:
       matrix:
         test: ${{ fromJSON(needs.find-vm-tests.outputs.tests) }}
     steps:
-      # - name: Maximize build space
-      #   uses: easimon/maximize-build-space@master
-      #   with:
-      #     root-reserve-mb: 512
-      #     swap-size-mb: 1024
-      #     remove-dotnet: "true"
-      #     remove-android: "true"
-      #     remove-haskell: "true"
-      #     remove-codeql: "true"
-      #     remove-docker-images: "true"
       - run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
@@ -105,12 +95,6 @@ jobs:
         with:
           name: wires
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-      # - run: |
-      #     mkdir -p ./.store/nix/store
-      #     mkdir -p ./.tmp
-      #     chmod -R 0777 ./.store
-      #     chmod -R 0777 ./.tmp
       - name: Build
+        timeout-minutes: 20
         run: nix build .#checks.x86_64-linux.${{ matrix.test }} --print-build-logs --impure
-        # env:
-        #   TMPDIR: "./.tmp"
