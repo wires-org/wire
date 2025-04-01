@@ -18,7 +18,9 @@ in
           pkgs,
           lib,
           ...
-        }:
+        }: let
+          snakeOil = import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs;
+         in
         {
           imports = [
             "${modulesPath}/virtualisation/disk-image.nix"
@@ -32,6 +34,9 @@ in
 
           virtualisation.memorySize = 4096;
           system.switch.enable = true;
+
+          services.openssh.enable = true;
+          users.users.root.openssh.authorizedKeys.keys = [ snakeOil.snakeOilEd25519PublicKey ];
         }
       )
     ];
