@@ -5,7 +5,7 @@ on:
 jobs:
   pre-job:
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
@@ -14,7 +14,7 @@ jobs:
         with:
           concurrent_skipping: "same_content_newer"
   pre-commit:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: pre-job
     if: needs.pre-job.outputs.should_skip != 'true'
     steps:
@@ -29,7 +29,7 @@ jobs:
       - name: Build
         run: nix develop --print-build-logs -v --command pre-commit run --all-files
   nextest:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: pre-job
     if: needs.pre-job.outputs.should_skip != 'true'
     steps:
@@ -51,7 +51,7 @@ jobs:
       - name: Nextest
         run: nix develop --print-build-logs -v --command cargo nextest run
   find-vm-tests:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     # needs: pre-job
     # if: needs.pre-job.outputs.should_skip != 'true'
     outputs:
@@ -73,7 +73,7 @@ jobs:
             'with builtins; filter ((import <nixpkgs>{}).lib.hasPrefix "nixos-vm-test") (attrNames (getFlake "${{ github.workspace }}").checks.x86_64-linux)'
           )" >> "$GITHUB_OUTPUT"
   vm-tests:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: find-vm-tests
     strategy:
       matrix:
