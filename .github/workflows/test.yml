@@ -73,7 +73,7 @@ jobs:
             'with builtins; filter ((import <nixpkgs>{}).lib.hasPrefix "nixos-vm-test") (attrNames (getFlake "${{ github.workspace }}").checks.x86_64-linux)'
           )" >> "$GITHUB_OUTPUT"
   vm-tests:
-    runs-on: self-hosted
+    runs-on: rainforest-node-1
     needs: find-vm-tests
     strategy:
       matrix:
