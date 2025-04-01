@@ -31,6 +31,7 @@ in
           };
 
           virtualisation.memorySize = 4096;
+          system.switch.enable = true;
         }
       )
     ];
