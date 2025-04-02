@@ -58,20 +58,31 @@ jobs:
       tests: ${{ steps.tests.outputs.tests }}
     steps:
       - uses: actions/checkout@v4
+      - name: Cache Tests
+        id: cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-tests-${{ hashFiles('tests/nix/**') }}
+          path: tests.json
       - uses: cachix/install-nix-action@v31
+        if: steps.cache.outputs.cache-hit != 'true'
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - uses: cachix/cachix-action@v16
+        if: steps.cache.outputs.cache-hit != 'true'
         with:
           name: wires
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - name: find tests
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          nix eval --impure --json --expr \
+            'with builtins; filter ((import <nixpkgs>{}).lib.hasPrefix "nixos-vm-test") (attrNames (getFlake "${{ github.workspace }}").checks.x86_64-linux)' \
+            > tests.json
+      - name: set output
         id: tests
         run: |
-          echo "tests=$(
-            nix eval --impure --json --expr \
-            'with builtins; filter ((import <nixpkgs>{}).lib.hasPrefix "nixos-vm-test") (attrNames (getFlake "${{ github.workspace }}").checks.x86_64-linux)'
-          )" >> "$GITHUB_OUTPUT"
+          echo "tests=$(cat tests.json)" >> "$GITHUB_OUTPUT"
   vm-tests:
     runs-on: rainforest-node-1
     needs: find-vm-tests
