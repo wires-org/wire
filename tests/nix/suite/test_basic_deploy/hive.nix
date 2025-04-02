@@ -4,6 +4,6 @@ in
 {
   meta.nixpkgs = utils.nixpkgs;
   receiver = utils.popTest {
-    networking.hostName = "receiverb";
+    # networking.hostName = "receiverb";
   };
 }
