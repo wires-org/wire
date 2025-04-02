@@ -6,7 +6,7 @@
   ...
 }:
 let
-  inherit (lib) mkOption mapAttrs' mapAttrsToList;
+  inherit (lib) mkOption mapAttrs';
   inherit (lib.types)
     submodule
     lines
@@ -65,21 +65,8 @@ in
           defaults =
             {
               pkgs,
-              evaluateHive,
-              testDir,
               ...
             }:
-            let
-              hive = evaluateHive {
-                nixpkgs = pkgs.path;
-                path = testDir;
-                hive = builtins.scopedImport {
-                  __nixPath = _b: null;
-                  __findFile = path: name: if name == "nixpkgs" then pkgs.path else throw "oops!!";
-                } "${testDir}/hive.nix";
-              };
-              nodes = mapAttrsToList (_: val: val.config.system.build.toplevel.drvPath) hive.nodes;
-            in
             {
               imports = [ ./test-opts.nix ];
               nix = {
@@ -89,7 +76,7 @@ in
 
               virtualisation.memorySize = 4096;
 
-              virtualisation.additionalPaths = nodes ++ [
+              virtualisation.additionalPaths = [
                 inputs.nixpkgs.outPath
                 inputs.self.outPath
               ];
