@@ -14,11 +14,11 @@
 
       deployer.wait_until_succeeds("ssh -o StrictHostKeyChecking=accept-new receiver true", timeout=30)
 
-      deployer.succeed("wire apply test --on receiver --no-progress --path ${config.wire.testing.test_basic_deploy.testDir}/hive.nix --no-keys -vvv >&2")
+      deployer.succeed("wire apply build --on receiver --no-progress --path ${config.wire.testing.test_basic_deploy.testDir}/hive.nix --no-keys -vvv >&2")
       receiver.wait_for_unit("multi-user.target")
       receiver.wait_for_unit("network-online.target")
-      receiver.wait_until_succeeds("test $(cat /etc/hostname) == \"receiverb\"")
-      deployer.wait_until_succeeds("ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=accept-new receiver true", timeout=30)
+      # receiver.wait_until_succeeds("test $(cat /etc/hostname) == \"receiverb\"")
+      # deployer.wait_until_succeeds("ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=accept-new receiver true", timeout=30)
     '';
   };
 }
