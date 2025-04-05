@@ -3,6 +3,7 @@
   nixosOptionsDoc,
   runCommand,
   wire,
+  nix,
   nodejs,
   pnpm,
   stdenv,
@@ -43,11 +44,12 @@ stdenv.mkDerivation (finalAttrs: {
     wire
     nodejs
     pnpm.configHook
+    nix
   ];
   src = ./.;
   pnpmDeps = pnpm.fetchDeps {
     inherit (finalAttrs) pname version src;
-    hash = "sha256-7ThshGf9tkCwSaz4DMTXxmjhN+2g0dErgzpgzJ2gv8Y";
+    hash = "sha256-QSk2+o8gMNWfpBgjKeW5DBrso9zGcbP06Ga2hK8df5A=";
   };
   patchPhase = ''
     cat ${optionsDoc} >> ./reference/module.md
@@ -55,5 +57,9 @@ stdenv.mkDerivation (finalAttrs: {
   '';
   buildPhase = "pnpm run build > build.log 2>&1";
   installPhase = "cp .vitepress/dist -r $out";
+  doCheck = true;
+  checkPhase = ''
+    nix-instantiate --eval --strict ./snippets > /dev/null
+  '';
   DEBUG = "*";
 })

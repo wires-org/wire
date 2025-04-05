@@ -38,6 +38,7 @@
           pkgs,
           inputs',
           config,
+          lib,
           ...
         }:
         {
@@ -49,12 +50,19 @@
             programs = {
               # rfc style
               nixfmt.enable = true;
-
+              # docs only
+              alejandra.enable = true;
               rustfmt.enable = true;
               just.enable = true;
               prettier.enable = true;
               protolint.enable = true;
               taplo.enable = true;
+            };
+            settings.formatter = {
+              nixfmt.excludes = [ "doc/snippets/*.nix" ];
+              alejandra = {
+                includes = lib.mkForce [ "doc/snippets/*.nix" ];
+              };
             };
           };
         };
