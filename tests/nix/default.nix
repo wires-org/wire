@@ -6,7 +6,12 @@
   ...
 }:
 let
-  inherit (lib) mkOption mapAttrs' mapAttrsToList;
+  inherit (lib)
+    mkOption
+    mapAttrs'
+    mapAttrsToList
+    flatten
+    ;
   inherit (lib.types)
     submodule
     lines
@@ -80,6 +85,17 @@ in
                 } "${testDir}/hive.nix";
               };
               nodes = mapAttrsToList (_: val: val.config.system.build.toplevel.drvPath) hive.nodes;
+              # fetch **all** dependencies of a flake
+              # it's called fetchLayer because my naming skills are awful
+              fetchLayer =
+                input:
+                let
+                  subLayers = if input ? inputs then map fetchLayer (builtins.attrValues input.inputs) else [ ];
+                in
+                [
+                  input.outPath
+                ]
+                ++ subLayers;
             in
             {
               imports = [ ./test-opts.nix ];
@@ -90,10 +106,14 @@ in
 
               virtualisation.memorySize = 4096;
 
-              virtualisation.additionalPaths = nodes ++ [
-                inputs.nixpkgs.outPath
-                inputs.self.outPath
-              ];
+              virtualisation.additionalPaths = flatten (
+                nodes
+                ++ (mapAttrsToList (_: fetchLayer) inputs)
+                ++ [
+                  self'.packages.wire
+                  self'.packages.agent
+                ]
+              );
 
             };
           node.specialArgs = {

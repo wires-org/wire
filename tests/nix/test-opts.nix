@@ -22,7 +22,7 @@ in
   config = mkMerge [
     (mkIf cfg.deployer {
       systemd.tmpfiles.rules = [
-        "L+ /root/.ssh/id_ed25519 - - - - ${snakeOil.snakeOilEd25519PrivateKey}"
+        "C+ /root/.ssh/id_ed25519 600 - - - ${snakeOil.snakeOilEd25519PrivateKey}"
       ];
       environment.systemPackages = [ wire ];
     })

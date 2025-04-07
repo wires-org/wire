@@ -1,9 +1,9 @@
 let
-  utils = import ../utils.nix;
+  utils = import ../utils.nix { testName = "test_basic_deploy"; };
 in
 {
   meta.nixpkgs = <nixpkgs>;
-  receiver = utils.popTest {
-    networking.hostName = "receiverb";
+  receiver = utils.popTest "x86_64-linux" "receiver" {
+    environment.etc."a".text = "b";
   };
 }

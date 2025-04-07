@@ -1,14 +1,9 @@
+{ testName }:
 let
-  lock = builtins.fromJSON (builtins.readFile ../../../flake.lock);
-  nodeName = lock.nodes.root.inputs.nixpkgs;
-  lockedNode = lock.nodes.${nodeName}.locked;
-  nixpkgs = fetchTarball {
-    url = lockedNode.url or "https://github.com/NixOS/nixpkgs/archive/${lockedNode.rev}.tar.gz";
-    sha256 = lockedNode.narHash;
-  };
+  flake = import ../../../.;
 in
 {
-  popTest = cfg: {
+  popTest = system: name: cfg: {
     imports = [
       cfg
       (
@@ -17,7 +12,13 @@ in
           ...
         }:
         {
-          imports = [ "${modulesPath}/virtualisation/disk-image.nix" ];
+          imports = [
+            "${modulesPath}/virtualisation/qemu-vm.nix"
+            "${modulesPath}/testing/test-instrumentation.nix"
+            flake.checks.${system}."nixos-vm-test-${testName}".nodes.${name}.system.build.networkConfig
+          ];
+
+          boot.loader.grub.enable = false;
         }
       )
     ];
