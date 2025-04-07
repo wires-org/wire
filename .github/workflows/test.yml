@@ -62,7 +62,7 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          key: ${{ runner.os }}-tests-${{ hashFiles('tests/nix/**') }}
+          key: ${{ runner.os }}-tests-${{ hashFiles('tests/nix/**', 'wire/**', 'runtime/**', 'flake.*') }}
           path: tests.json
       - uses: cachix/install-nix-action@v31
         if: steps.cache.outputs.cache-hit != 'true'
