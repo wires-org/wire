@@ -88,6 +88,7 @@ export default defineConfig({
         customIcon: {
           nixos: "vscode-icons:file-type-nix",
           "configuration.nix": "vscode-icons:file-type-nix",
+          "hive.nix": "vscode-icons:file-type-nix",
           "module.nix": "vscode-icons:file-type-nix",
           home: localIconLoader(import.meta.url, "../assets/homemanager.svg"),
           ".conf": "vscode-icons:file-type-config",
