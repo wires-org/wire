@@ -15,7 +15,7 @@ tracing-indicatif = { workspace = true }
 tracing-subscriber = { workspace = true }
 im = { workspace = true }
 serde-query = "0.2.0"
-thiserror = "1.0.62"
+thiserror = "2.0.12"
 serde_repr = "0.1.20"
 regex = "1.11.1"
 derive_more = "0.99.18"
