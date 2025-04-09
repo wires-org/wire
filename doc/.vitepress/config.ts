@@ -39,6 +39,7 @@ export default defineConfig({
           items: [
             { text: "What is Wire?", link: "/guide/wire" },
             { text: "Getting Started", link: "/guide/getting-started" },
+            { text: "Targeting Nodes", link: "/guide/targeting" },
           ],
         },
         {
@@ -46,7 +47,6 @@ export default defineConfig({
           items: [
             { text: "Parallelism", link: "/guide/parallelism" },
             { text: "Secret management", link: "/guide/keys" },
-            { text: "Tagging", link: "/guide/tagging" },
             { text: "hive.default", link: "/guide/hive-default" },
             { text: "Magic Rollback", link: "/guide/magic-rollback" },
           ],
