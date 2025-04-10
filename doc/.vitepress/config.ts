@@ -61,6 +61,7 @@ export default defineConfig({
           text: "Reference",
           items: [
             { text: "CLI", link: "/reference/cli" },
+            { text: "Meta Options", link: "/reference/meta" },
             { text: "Module Options", link: "/reference/module" },
           ],
         },
