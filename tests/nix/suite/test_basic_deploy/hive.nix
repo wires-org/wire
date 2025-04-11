@@ -3,7 +3,7 @@ let
 in
 {
   meta.nixpkgs = <nixpkgs>;
-  receiver = utils.popTest "x86_64-linux" "receiver" {
+  receiver = utils.mkHiveNode "x86_64-linux" "receiver" {
     environment.etc."a".text = "b";
   };
 }

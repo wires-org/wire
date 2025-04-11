@@ -3,7 +3,7 @@ let
   flake = import ../../../.;
 in
 {
-  popTest = system: name: cfg: {
+  mkHiveNode = system: name: cfg: {
     imports = [
       cfg
       (
@@ -17,6 +17,8 @@ in
             "${modulesPath}/testing/test-instrumentation.nix"
             flake.checks.${system}."nixos-vm-test-${testName}".nodes.${name}.system.build.networkConfig
           ];
+
+          nixpkgs.hostPlatform = system;
 
           boot.loader.grub.enable = false;
         }
