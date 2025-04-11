@@ -1,3 +1,7 @@
+---
+comment: true
+---
+
 # What is Wire?
 
 Wire is a tool to deploy NixOS systems. Its configuration is a superset[^1] of [colmena](https://colmena.cli.rs/), however it is **not** a fork.
