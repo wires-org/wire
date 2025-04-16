@@ -5,7 +5,6 @@ let
   flake = import ../../../.;
 in
 {
-
   # This is glue for the newly deployed VMs as they need specific configuration
   # such as static network configuration and other nitpicky VM-specific options.
   # I thank Colmena & NixOps devs for providing me pointers on how to correctly create this, so
@@ -20,10 +19,7 @@ in
       imports = [
         cfg
         (
-          {
-            modulesPath,
-            ...
-          }:
+          { modulesPath, ... }:
           {
             imports = [
               "${modulesPath}/virtualisation/qemu-vm.nix"

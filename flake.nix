@@ -9,6 +9,9 @@
     fenix.url = "github:nix-community/fenix";
     fenix.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.url = "github:numtide/treefmt-nix";
+
+    nixpkgs_current_stable.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs_prev_stable.url = "github:NixOS/nixpkgs/nixos-24.05";
   };
   outputs =
     {
