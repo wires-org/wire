@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "devDependencies": {
-    "vitepress": "^1.6.3"
+    "vitepress": "^1.6.3",
+    "vue": "^3.5.13"
   },
   "scripts": {
     "dev": "vitepress dev .",
@@ -17,6 +18,7 @@
   },
   "dependencies": {
     "markdown-it-footnote": "^4.0.0",
+    "vitepress-plugin-comment-with-giscus": "^1.1.15",
     "vitepress-plugin-group-icons": "^1.5.2"
   }
 }

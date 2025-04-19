@@ -1,3 +1,7 @@
+---
+comment: true
+---
+
 # What is Wire?
 
 <p style="display: flex; gap: 8px">

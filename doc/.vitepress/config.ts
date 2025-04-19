@@ -39,14 +39,14 @@ export default defineConfig({
           items: [
             { text: "What is Wire?", link: "/guide/wire" },
             { text: "Getting Started", link: "/guide/getting-started" },
+            { text: "Targeting Nodes", link: "/guide/targeting" },
           ],
         },
         {
           text: "Features",
           items: [
-            { text: "Parallelism", link: "/guide/parallelism" },
             { text: "Secret management", link: "/guide/keys" },
-            { text: "Tagging", link: "/guide/tagging" },
+            { text: "Parallelism", link: "/guide/parallelism" },
             { text: "hive.default", link: "/guide/hive-default" },
             { text: "Magic Rollback", link: "/guide/magic-rollback" },
           ],
@@ -61,6 +61,7 @@ export default defineConfig({
           text: "Reference",
           items: [
             { text: "CLI", link: "/reference/cli" },
+            { text: "Meta Options", link: "/reference/meta" },
             { text: "Module Options", link: "/reference/module" },
           ],
         },
@@ -88,6 +89,7 @@ export default defineConfig({
         customIcon: {
           nixos: "vscode-icons:file-type-nix",
           "configuration.nix": "vscode-icons:file-type-nix",
+          "hive.nix": "vscode-icons:file-type-nix",
           "module.nix": "vscode-icons:file-type-nix",
           home: localIconLoader(import.meta.url, "../assets/homemanager.svg"),
           ".conf": "vscode-icons:file-type-config",
