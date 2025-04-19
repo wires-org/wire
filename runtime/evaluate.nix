@@ -7,20 +7,11 @@
 let
   module = import ./module.nix;
 
-  mergedHive =
-    {
-      meta = { };
+  mergedHive = {
+    meta = { };
 
-      defaults = { };
-    }
-    // hive
-    # Map nixosConfigurations into nodes
-    // (builtins.mapAttrs (name: value: {
-      imports =
-        value._module.args.modules
-        # Include any custom stuff within `colmena`
-        ++ [ hive.${name} or { } ];
-    }) nixosConfigurations);
+    defaults = { };
+  } // hive;
 
   nodeNames = builtins.filter (
     name:
@@ -40,22 +31,31 @@ let
     else
       import nixpkgs { };
 
+  filtedNixosConfigurations = nixpkgs.lib.filterAttrs (
+    name: _v: mergedHive ? name
+  ) nixosConfigurations;
+
   evaluateNode =
     name:
     let
       evalConfig = import (resolvedNixpkgs.path + "/nixos/lib/eval-config.nix");
+      hive =
+        mergedHive
+        // (builtins.mapAttrs (name: value: {
+          imports = value._module.args.modules ++ [ hive.${name} or { } ];
+        }) filtedNixosConfigurations);
     in
     evalConfig {
       modules = [
         module
 
-        mergedHive.defaults
-        mergedHive.${name}
+        hive.defaults
+        hive.${name}
       ];
       system = null;
       specialArgs = {
         inherit name nodes;
-      } // mergedHive.meta.specialArgs or { };
+      } // hive.meta.specialArgs or { };
     };
   nodes = builtins.listToAttrs (
     map (name: {
