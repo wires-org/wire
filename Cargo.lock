@@ -18,6 +18,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
+name = "agent"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "nix",
+ "prost 0.13.5",
+ "prost-build",
+ "tokio",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -576,17 +587,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "key_agent"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "nix",
- "prost 0.13.5",
- "prost-build",
- "tokio",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -596,12 +596,12 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 name = "lib"
 version = "0.1.0"
 dependencies = [
+ "agent",
  "async-trait",
  "derive_more",
  "futures",
  "gethostname",
  "im",
- "key_agent",
  "prost 0.13.5",
  "regex",
  "serde",

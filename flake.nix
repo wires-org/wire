@@ -29,7 +29,7 @@
         ./nix/shells.nix
         ./nix/checks.nix
         ./wire/cli
-        ./wire/key_agent
+        ./wire/agent
         ./doc
         ./tests/nix
       ];

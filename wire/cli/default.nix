@@ -32,7 +32,7 @@
           postBuild = ''
             wrapProgram $out/bin/wire \
                 --set WIRE_RUNTIME ${../../runtime} \
-                --set WIRE_KEY_AGENT ${self'.packages.agent}
+                --set WIRE_AGENT ${self'.packages.agent}
           '';
           meta.mainProgram = "wire";
         };

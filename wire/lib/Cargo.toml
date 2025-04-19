@@ -19,7 +19,7 @@ thiserror = "1.0.62"
 serde_repr = "0.1.20"
 regex = "1.11.1"
 derive_more = "0.99.18"
-key_agent = { path = "../key_agent" }
+agent = { path = "../agent" }
 futures = "0.3.31"
 prost = { workspace = true }
 gethostname = "1.0.1"

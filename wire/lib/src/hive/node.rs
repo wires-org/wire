@@ -12,7 +12,7 @@ use tracing_indicatif::span_ext::IndicatifSpanExt;
 use crate::nix::StreamTracing;
 use crate::SubCommandModifiers;
 
-use super::key::{Key, PushKeyAgentStep, UploadKeyAt, UploadKeyStep};
+use super::key::{Key, PushAgentStep, UploadKeyAt, UploadKeyStep};
 use super::steps::activate::SwitchToConfigurationStep;
 use super::HiveLibError;
 
@@ -117,7 +117,7 @@ pub trait ExecuteStep: Send + Sync + Display {
 pub struct StepState {
     pub evaluation: Option<Derivation>,
     pub build: Option<String>,
-    pub key_agent_directory: Option<String>,
+    pub agent_directory: Option<String>,
 }
 
 pub struct Context<'a> {
@@ -139,7 +139,7 @@ impl<'a> GoalExecutor<'a> {
     pub fn new(context: Context<'a>) -> Self {
         Self {
             steps: vec![
-                Box::new(PushKeyAgentStep),
+                Box::new(PushAgentStep),
                 Box::new(UploadKeyStep {
                     moment: UploadKeyAt::AnyOpportunity,
                 }),

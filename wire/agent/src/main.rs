@@ -11,7 +11,7 @@ use std::{
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-use key_agent::keys::Keys;
+use agent::keys::Keys;
 
 fn create_path(key_path: &Path) -> Result<(), anyhow::Error> {
     let prefix = key_path.parent().unwrap();

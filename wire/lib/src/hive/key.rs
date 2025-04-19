@@ -128,7 +128,7 @@ async fn copy_buffers<T: AsyncWriteExt + Unpin>(
     Ok(())
 }
 
-async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), Error> {
+async fn process_key(key: &Key) -> Result<(agent::keys::Key, Vec<u8>), Error> {
     let mut reader = create_reader(&key.source).await?;
 
     let mut buf = Vec::new();
@@ -146,7 +146,7 @@ async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), Error
     );
 
     Ok((
-        key_agent::keys::Key {
+        agent::keys::Key {
             length: buf
                 .len()
                 .try_into()
@@ -164,7 +164,7 @@ async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), Error
 pub struct UploadKeyStep {
     pub moment: UploadKeyAt,
 }
-pub struct PushKeyAgentStep;
+pub struct PushAgentStep;
 
 impl Display for UploadKeyStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -172,9 +172,9 @@ impl Display for UploadKeyStep {
     }
 }
 
-impl Display for PushKeyAgentStep {
+impl Display for PushAgentStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Push the key agent")
+        write!(f, "Push the agent")
     }
 }
 
@@ -207,7 +207,7 @@ impl ExecuteStep for UploadKeyStep {
     }
 
     async fn execute(&self, ctx: &mut Context<'_>) -> Result<(), HiveLibError> {
-        let agent_directory = ctx.state.key_agent_directory.as_ref().unwrap();
+        let agent_directory = ctx.state.agent_directory.as_ref().unwrap();
 
         let futures = ctx
             .node
@@ -219,7 +219,7 @@ impl ExecuteStep for UploadKeyStep {
             })
             .map(|key| async move { process_key(key).await });
 
-        let (keys, bufs): (Vec<key_agent::keys::Key>, Vec<Vec<u8>>) = join_all(futures)
+        let (keys, bufs): (Vec<agent::keys::Key>, Vec<Vec<u8>>) = join_all(futures)
             .await
             .into_iter()
             .collect::<Result<Vec<_>, Error>>()
@@ -227,7 +227,7 @@ impl ExecuteStep for UploadKeyStep {
             .into_iter()
             .unzip();
 
-        let msg = key_agent::keys::Keys { keys };
+        let msg = agent::keys::Keys { keys };
 
         trace!("Sending message {msg:?}");
 
@@ -237,7 +237,7 @@ impl ExecuteStep for UploadKeyStep {
 
         let mut child = command
             .args([
-                format!("{agent_directory}/bin/key_agent"),
+                format!("{agent_directory}/bin/agent"),
                 buf.len().to_string(),
             ])
             .stdout(Stdio::piped())
@@ -278,20 +278,20 @@ impl ExecuteStep for UploadKeyStep {
 }
 
 #[async_trait]
-impl ExecuteStep for PushKeyAgentStep {
+impl ExecuteStep for PushAgentStep {
     fn should_execute(&self, ctx: &Context) -> bool {
         should_execute(&UploadKeyAt::AnyOpportunity, ctx)
     }
 
     async fn execute(&self, ctx: &mut Context<'_>) -> Result<(), HiveLibError> {
-        let agent_directory = match env::var_os("WIRE_KEY_AGENT") {
+        let agent_directory = match env::var_os("WIRE_AGENT") {
             Some(agent) => agent.into_string().unwrap(),
-            None => panic!("WIRE_KEY_AGENT environment variable not set"),
+            None => panic!("WIRE_AGENT environment variable not set"),
         };
 
         push(ctx.node, ctx.name, Push::Path(&agent_directory)).await?;
 
-        ctx.state.key_agent_directory = Some(agent_directory);
+        ctx.state.agent_directory = Some(agent_directory);
 
         Ok(())
     }
