@@ -104,7 +104,7 @@ in
                 # Relevant links:
                 # - https://discord.com/channels/1209971237770498088/1262564341413056632/1360866631214956615
                 # - https://nix.dev/manual/nix/latest/release-notes/rl-2.26 (possible breaking changes here)
-                package = pkgs.nixVersions.nix_2_24;
+                # package = pkgs.nixVersions.nix_2_24;
               };
 
               environment.systemPackages = [ pkgs.ripgrep ];
