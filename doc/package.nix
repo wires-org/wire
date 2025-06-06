@@ -49,7 +49,7 @@ stdenv.mkDerivation (finalAttrs: {
   src = ./.;
   pnpmDeps = pnpm.fetchDeps {
     inherit (finalAttrs) pname version src;
-    hash = "sha256-S+x/Q0T7lvIavVQUmmLlF+Tvtpn+AvFIdvFAogqO65k=";
+    hash = "sha256-/K3BQ0pQDoNjySPn2AuHOf9TNmmkr2e37UPOkTQRjPQ=";
   };
   patchPhase = ''
     cat ${optionsDoc} >> ./reference/module.md
