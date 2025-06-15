@@ -57,7 +57,7 @@ pub enum UploadKeyAt {
     #[serde(rename = "post-activation")]
     PostActivation,
     #[serde(skip)]
-    AnyOpportunity,
+    NoFilter,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
@@ -79,7 +79,7 @@ fn key_step_should_execute(moment: &UploadKeyAt, ctx: &crate::hive::node::Contex
         return false;
     }
 
-    if *moment == UploadKeyAt::AnyOpportunity && matches!(ctx.goal, Goal::Keys) {
+    if *moment == UploadKeyAt::NoFilter && matches!(ctx.goal, Goal::Keys) {
         return true;
     }
 
@@ -182,13 +182,13 @@ async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), KeyEr
 }
 
 pub struct KeysStep {
-    pub moment: UploadKeyAt,
+    pub filter: UploadKeyAt,
 }
 pub struct PushKeyAgentStep;
 
 impl Display for KeysStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Upload key @ {:?}", self.moment)
+        write!(f, "Upload key @ {:?}", self.filter)
     }
 }
 
@@ -211,7 +211,7 @@ fn should_execute(moment: &UploadKeyAt, ctx: &Context) -> bool {
 #[async_trait]
 impl ExecuteStep for KeysStep {
     fn should_execute(&self, ctx: &Context) -> bool {
-        should_execute(&self.moment, ctx)
+        should_execute(&self.filter, ctx)
     }
 
     async fn execute(&self, ctx: &mut Context<'_>) -> Result<(), HiveLibError> {
@@ -222,8 +222,8 @@ impl ExecuteStep for KeysStep {
             .keys
             .iter()
             .filter(|key| {
-                self.moment == UploadKeyAt::AnyOpportunity
-                    || (self.moment != UploadKeyAt::AnyOpportunity && key.upload_at != self.moment)
+                self.filter == UploadKeyAt::NoFilter
+                    || (self.filter != UploadKeyAt::NoFilter && key.upload_at != self.filter)
             })
             .map(|key| async move { process_key(key).await });
 
@@ -295,7 +295,7 @@ impl ExecuteStep for KeysStep {
 #[async_trait]
 impl ExecuteStep for PushKeyAgentStep {
     fn should_execute(&self, ctx: &Context) -> bool {
-        should_execute(&UploadKeyAt::AnyOpportunity, ctx)
+        should_execute(&UploadKeyAt::NoFilter, ctx)
     }
 
     async fn execute(&self, ctx: &mut Context<'_>) -> Result<(), HiveLibError> {

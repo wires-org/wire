@@ -147,10 +147,10 @@ impl<'a> GoalExecutor<'a> {
             steps: vec![
                 Box::new(PushKeyAgentStep),
                 Box::new(KeysStep {
-                    moment: UploadKeyAt::AnyOpportunity,
+                    filter: UploadKeyAt::NoFilter,
                 }),
                 Box::new(KeysStep {
-                    moment: UploadKeyAt::PreActivation,
+                    filter: UploadKeyAt::PreActivation,
                 }),
                 Box::new(super::steps::evaluate::Step),
                 Box::new(super::steps::push::EvaluatedOutputStep),
@@ -158,7 +158,7 @@ impl<'a> GoalExecutor<'a> {
                 Box::new(super::steps::push::BuildOutputStep),
                 Box::new(SwitchToConfigurationStep),
                 Box::new(KeysStep {
-                    moment: UploadKeyAt::PostActivation,
+                    filter: UploadKeyAt::PostActivation,
                 }),
             ],
             context,
