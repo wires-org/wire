@@ -79,13 +79,15 @@ fn should_execute(filter: &UploadKeyAt, ctx: &crate::hive::node::Context) -> boo
         return false;
     }
 
-    if *filter == UploadKeyAt::NoFilter && matches!(ctx.goal, Goal::Keys) {
-        return true;
-    }
-
+    // should execute if no filter, and the goal is keys.
+    // otherwise, only execute if the goal is switch
     matches!(
-        ctx.goal,
-        Goal::SwitchToConfiguration(SwitchToConfigurationGoal::Switch)
+        (filter, &ctx.goal),
+        (UploadKeyAt::NoFilter, Goal::Keys)
+            | (
+                _,
+                Goal::SwitchToConfiguration(SwitchToConfigurationGoal::Switch)
+            )
     )
 }
 
