@@ -37,9 +37,6 @@ pub enum KeyError {
 
     #[error("Failed to parse key permissions")]
     ParseKeyPermissions(#[source] ParseIntError),
-
-    #[error("failed to place a key locally")]
-    FailedToPlaceLocalKey(#[source] std::io::Error),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
