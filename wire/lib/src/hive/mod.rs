@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::nix::{EvalGoal, get_eval_command};
 use crate::{HiveLibError, SubCommandModifiers};
-pub mod key;
 pub mod node;
-mod steps;
+pub mod steps;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Hive {

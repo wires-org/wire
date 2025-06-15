@@ -1,70 +1,23 @@
 use async_trait::async_trait;
 use futures::future::join_all;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::Display;
 use std::pin::Pin;
-use std::process::{ExitStatus, Stdio};
+use std::process::Stdio;
 use std::str::from_utf8;
 use std::{io::Cursor, path::PathBuf};
-use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::{fs::File, io::AsyncRead};
 use tracing::{Span, debug, info, trace, warn};
 
-use crate::hive::node::{Push, should_apply_locally};
+use crate::hive::node::{
+    Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
+};
 use crate::{HiveLibError, create_ssh_command};
 
-use super::node::{Context, ExecuteStep, Goal, push};
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("error reading file")]
-    File(#[source] std::io::Error),
-
-    #[error("error spawning command")]
-    CommandSpawnError(#[source] std::io::Error),
-
-    #[error("key command failed with status {}: {}", .0,.1)]
-    CommandError(ExitStatus, String),
-
-    #[error("Command list empty")]
-    Empty,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
-#[serde(tag = "t", content = "c")]
-pub enum Source {
-    String(String),
-    Path(PathBuf),
-    Command(Vec<String>),
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum UploadKeyAt {
-    #[serde(rename = "pre-activation")]
-    PreActivation,
-    #[serde(rename = "post-activation")]
-    PostActivation,
-    #[serde(skip)]
-    AnyOpportunity,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Key {
-    pub name: String,
-    #[serde(rename = "destDir")]
-    pub dest_dir: String,
-    pub path: PathBuf,
-    pub group: String,
-    pub user: String,
-    pub permissions: String,
-    pub source: Source,
-    #[serde(rename = "uploadAt")]
-    pub upload_at: UploadKeyAt,
-}
+use crate::hive::steps::keys::{Error, Key, Source, UploadKeyAt};
 
 pub trait PushKeys {
     fn push_keys(
@@ -196,7 +149,7 @@ fn should_execute(moment: &UploadKeyAt, ctx: &Context) -> bool {
 
     matches!(
         ctx.goal,
-        Goal::SwitchToConfiguration(super::node::SwitchToConfigurationGoal::Switch)
+        Goal::SwitchToConfiguration(SwitchToConfigurationGoal::Switch)
     )
 }
 

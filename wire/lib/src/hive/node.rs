@@ -10,10 +10,11 @@ use tracing::{Instrument, Span, error, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 use crate::SubCommandModifiers;
+use crate::hive::steps::keys::remote::{PushKeyAgentStep, UploadKeyStep};
+use crate::hive::steps::keys::{Key, UploadKeyAt};
 use crate::nix::StreamTracing;
 
 use super::HiveLibError;
-use super::key::{Key, PushKeyAgentStep, UploadKeyAt, UploadKeyStep};
 use super::steps::activate::SwitchToConfigurationStep;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq, derive_more::Display)]

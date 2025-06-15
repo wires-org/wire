@@ -2,8 +2,8 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::must_use_candidate)]
 use hive::{
-    key::Error,
     node::{Name, SwitchToConfigurationGoal, Target},
+    steps::keys::Error,
 };
 use nix_log::{NixLog, Trace};
 use std::path::PathBuf;
