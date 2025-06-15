@@ -6,7 +6,7 @@ use thiserror::Error;
 pub mod remote;
 
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum KeyError {
     #[error("error reading file")]
     File(#[source] std::io::Error),
 

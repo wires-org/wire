@@ -17,7 +17,7 @@ use crate::hive::node::{
 };
 use crate::{HiveLibError, create_ssh_command};
 
-use crate::hive::steps::keys::{Error, Key, Source, UploadKeyAt};
+use crate::hive::steps::keys::{Key, KeyError, Source, UploadKeyAt};
 
 pub trait PushKeys {
     fn push_keys(
@@ -27,27 +27,29 @@ pub trait PushKeys {
     ) -> impl std::future::Future<Output = Result<(), HiveLibError>> + Send;
 }
 
-async fn create_reader(source: &'_ Source) -> Result<Pin<Box<dyn AsyncRead + Send + '_>>, Error> {
+async fn create_reader(
+    source: &'_ Source,
+) -> Result<Pin<Box<dyn AsyncRead + Send + '_>>, KeyError> {
     match source {
-        Source::Path(path) => Ok(Box::pin(File::open(path).await.map_err(Error::File)?)),
+        Source::Path(path) => Ok(Box::pin(File::open(path).await.map_err(KeyError::File)?)),
         Source::String(string) => Ok(Box::pin(Cursor::new(string))),
         Source::Command(args) => {
-            let output = Command::new(args.first().ok_or(Error::Empty)?)
+            let output = Command::new(args.first().ok_or(KeyError::Empty)?)
                 .args(&args[1..])
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
-                .map_err(Error::CommandSpawnError)?
+                .map_err(KeyError::CommandSpawnError)?
                 .wait_with_output()
                 .await
-                .map_err(Error::CommandSpawnError)?;
+                .map_err(KeyError::CommandSpawnError)?;
 
             if output.status.success() {
                 return Ok(Box::pin(Cursor::new(output.stdout)));
             }
 
-            Err(Error::CommandError(
+            Err(KeyError::CommandError(
                 output.status,
                 from_utf8(&output.stderr).unwrap().to_string(),
             ))
@@ -81,7 +83,7 @@ async fn copy_buffers<T: AsyncWriteExt + Unpin>(
     Ok(())
 }
 
-async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), Error> {
+async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), KeyError> {
     let mut reader = create_reader(&key.source).await?;
 
     let mut buf = Vec::new();
@@ -175,7 +177,7 @@ impl ExecuteStep for UploadKeyStep {
         let (keys, bufs): (Vec<key_agent::keys::Key>, Vec<Vec<u8>>) = join_all(futures)
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, Error>>()
+            .collect::<Result<Vec<_>, KeyError>>()
             .map_err(HiveLibError::KeyError)?
             .into_iter()
             .unzip();
