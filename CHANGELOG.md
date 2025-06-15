@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It only compiles the key agent for the host that builds `wire-small`.
 - `--no-progress` now defaults to true if stdin does not refer to a tty (unix pipelines, in CI).
 
+### Fixed
+
+- Keys can now be deployed to localhost.
+
 ## [0.2.0] - 2025-04-21
 
 ### Added
