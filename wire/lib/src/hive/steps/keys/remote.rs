@@ -3,51 +3,19 @@ use futures::future::join_all;
 use prost::Message;
 use std::env;
 use std::fmt::Display;
-use std::pin::Pin;
+use std::path::PathBuf;
 use std::process::Stdio;
-use std::str::from_utf8;
-use std::{io::Cursor, path::PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
-use tokio::{fs::File, io::AsyncRead};
 use tracing::{debug, info, trace, warn};
 
-use crate::hive::node::{
-    Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
-};
+use crate::hive::node::{Context, ExecuteStep, Push, push, should_apply_locally};
+use crate::hive::steps::activate::get_elevation;
 use crate::{HiveLibError, create_ssh_command};
 
-use crate::hive::steps::keys::{Key, KeyError, Source, UploadKeyAt};
-
-async fn create_reader(
-    source: &'_ Source,
-) -> Result<Pin<Box<dyn AsyncRead + Send + '_>>, KeyError> {
-    match source {
-        Source::Path(path) => Ok(Box::pin(File::open(path).await.map_err(KeyError::File)?)),
-        Source::String(string) => Ok(Box::pin(Cursor::new(string))),
-        Source::Command(args) => {
-            let output = Command::new(args.first().ok_or(KeyError::Empty)?)
-                .args(&args[1..])
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(KeyError::CommandSpawnError)?
-                .wait_with_output()
-                .await
-                .map_err(KeyError::CommandSpawnError)?;
-
-            if output.status.success() {
-                return Ok(Box::pin(Cursor::new(output.stdout)));
-            }
-
-            Err(KeyError::CommandError(
-                output.status,
-                from_utf8(&output.stderr).unwrap().to_string(),
-            ))
-        }
-    }
-}
+use crate::hive::steps::keys::{
+    Key, KeyError, UploadKeyAt, create_reader, get_u32_permission, key_step_should_execute,
+};
 
 async fn copy_buffer<T: AsyncWriteExt + Unpin>(
     reader: &mut T,
@@ -100,20 +68,19 @@ async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), KeyEr
                 .expect("Failed to conver usize buf length to i32"),
             user: key.user.clone(),
             group: key.group.clone(),
-            permissions: u32::from_str_radix(&key.permissions, 8)
-                .expect("Failed to convert octal string to u32"),
+            permissions: get_u32_permission(key)?,
             destination: destination.into_os_string().into_string().unwrap(),
         },
         buf,
     ))
 }
 
-pub struct UploadKeyStep {
+pub struct UploadKeysToRemoteStep {
     pub moment: UploadKeyAt,
 }
 pub struct PushKeyAgentStep;
 
-impl Display for UploadKeyStep {
+impl Display for UploadKeysToRemoteStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Upload key @ {:?}", self.moment)
     }
@@ -126,29 +93,17 @@ impl Display for PushKeyAgentStep {
 }
 
 fn should_execute(moment: &UploadKeyAt, ctx: &Context) -> bool {
-    if ctx.no_keys {
-        return false;
-    }
-    if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
-        warn!(
-            "SKIP STEP FOR {}: Pushing keys locally is unimplemented",
-            ctx.name.to_string()
-        );
+    if !key_step_should_execute(moment, ctx) {
         return false;
     }
 
-    if *moment == UploadKeyAt::AnyOpportunity && matches!(ctx.goal, Goal::Keys) {
-        return true;
-    }
-
-    matches!(
-        ctx.goal,
-        Goal::SwitchToConfiguration(SwitchToConfigurationGoal::Switch)
-    )
+    // excute step if node is not localhost
+    // !should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string())
+    true
 }
 
 #[async_trait]
-impl ExecuteStep for UploadKeyStep {
+impl ExecuteStep for UploadKeysToRemoteStep {
     fn should_execute(&self, ctx: &Context) -> bool {
         should_execute(&self.moment, ctx)
     }
@@ -180,7 +135,14 @@ impl ExecuteStep for UploadKeyStep {
 
         let buf = msg.encode_to_vec();
 
-        let mut command = create_ssh_command(&ctx.node.target, true);
+        let mut command =
+            if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
+                warn!("Placing keys locally for node {0}", ctx.name);
+                get_elevation("wire key agent")?;
+                Command::new("sudo")
+            } else {
+                create_ssh_command(&ctx.node.target, true)
+            };
 
         let mut child = command
             .args([
@@ -245,7 +207,9 @@ impl ExecuteStep for PushKeyAgentStep {
             ),
         };
 
-        push(ctx.node, ctx.name, Push::Path(&agent_directory)).await?;
+        if !should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
+            push(ctx.node, ctx.name, Push::Path(&agent_directory)).await?;
+        }
 
         ctx.state.key_agent_directory = Some(agent_directory);
 

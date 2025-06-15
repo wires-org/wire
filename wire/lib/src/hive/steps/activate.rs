@@ -19,8 +19,8 @@ impl Display for SwitchToConfigurationStep {
     }
 }
 
-fn get_elevation() -> Result<Output, HiveLibError> {
-    info!("Attempting to elevate for local deployment.");
+pub(crate) fn get_elevation(reason: &str) -> Result<Output, HiveLibError> {
+    info!("Attempting to elevate for {reason}.");
     suspend_tracing_indicatif(|| {
         let mut command = std::process::Command::new("sudo");
         command.arg("-v").output()
@@ -49,7 +49,7 @@ impl ExecuteStep for SwitchToConfigurationStep {
                 if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
                     // Refresh sudo timeout
                     warn!("Running nix-env ON THIS MACHINE for node {0}", ctx.name);
-                    get_elevation()?;
+                    get_elevation("nix-env")?;
                     let mut command = Command::new("sudo");
                     command.arg("nix-env");
                     command
@@ -87,7 +87,7 @@ impl ExecuteStep for SwitchToConfigurationStep {
                     "Running switch-to-configuration {goal:?} ON THIS MACHINE for node {0}",
                     ctx.name
                 );
-                get_elevation()?;
+                get_elevation("switch-to-configuration")?;
                 let mut command = Command::new("sudo");
                 command.arg(cmd);
                 command

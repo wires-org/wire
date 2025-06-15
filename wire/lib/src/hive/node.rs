@@ -10,7 +10,7 @@ use tracing::{Instrument, Span, error, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 use crate::SubCommandModifiers;
-use crate::hive::steps::keys::remote::{PushKeyAgentStep, UploadKeyStep};
+use crate::hive::steps::keys::remote::{PushKeyAgentStep, UploadKeysToRemoteStep};
 use crate::hive::steps::keys::{Key, UploadKeyAt};
 use crate::nix::StreamTracing;
 
@@ -147,10 +147,10 @@ impl<'a> GoalExecutor<'a> {
         Self {
             steps: vec![
                 Box::new(PushKeyAgentStep),
-                Box::new(UploadKeyStep {
+                Box::new(UploadKeysToRemoteStep {
                     moment: UploadKeyAt::AnyOpportunity,
                 }),
-                Box::new(UploadKeyStep {
+                Box::new(UploadKeysToRemoteStep {
                     moment: UploadKeyAt::PreActivation,
                 }),
                 Box::new(super::steps::evaluate::Step),
@@ -158,7 +158,7 @@ impl<'a> GoalExecutor<'a> {
                 Box::new(super::steps::build::Step),
                 Box::new(super::steps::push::BuildOutputStep),
                 Box::new(SwitchToConfigurationStep),
-                Box::new(UploadKeyStep {
+                Box::new(UploadKeysToRemoteStep {
                     moment: UploadKeyAt::PostActivation,
                 }),
             ],
