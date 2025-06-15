@@ -1,21 +1,127 @@
 use async_trait::async_trait;
 use futures::future::join_all;
 use prost::Message;
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::Display;
-use std::path::PathBuf;
-use std::process::Stdio;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::io::Cursor;
+use std::pin::Pin;
+use std::process::{ExitStatus, Stdio};
+use std::str::from_utf8;
+use std::{num::ParseIntError, path::PathBuf};
+use thiserror::Error;
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt};
 use tokio::process::Command;
+use tokio::{fs::File, io::AsyncRead};
 use tracing::{debug, info, trace, warn};
 
-use crate::hive::node::{Context, ExecuteStep, Push, push, should_apply_locally};
+use crate::hive::node::{
+    Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
+};
 use crate::hive::steps::activate::get_elevation;
 use crate::{HiveLibError, create_ssh_command};
 
-use crate::hive::steps::keys::{
-    Key, KeyError, UploadKeyAt, create_reader, get_u32_permission, key_step_should_execute,
-};
+#[derive(Debug, Error)]
+pub enum KeyError {
+    #[error("error reading file")]
+    File(#[source] std::io::Error),
+
+    #[error("error spawning command")]
+    CommandSpawnError(#[source] std::io::Error),
+
+    #[error("key command failed with status {}: {}", .0,.1)]
+    CommandError(ExitStatus, String),
+
+    #[error("Command list empty")]
+    Empty,
+
+    #[error("Failed to parse key permissions")]
+    ParseKeyPermissions(#[source] ParseIntError),
+
+    #[error("failed to place a key locally")]
+    FailedToPlaceLocalKey(#[source] std::io::Error),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
+#[serde(tag = "t", content = "c")]
+pub enum Source {
+    String(String),
+    Path(PathBuf),
+    Command(Vec<String>),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
+pub enum UploadKeyAt {
+    #[serde(rename = "pre-activation")]
+    PreActivation,
+    #[serde(rename = "post-activation")]
+    PostActivation,
+    #[serde(skip)]
+    AnyOpportunity,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Key {
+    pub name: String,
+    #[serde(rename = "destDir")]
+    pub dest_dir: String,
+    pub path: PathBuf,
+    pub group: String,
+    pub user: String,
+    pub permissions: String,
+    pub source: Source,
+    #[serde(rename = "uploadAt")]
+    pub upload_at: UploadKeyAt,
+}
+
+fn key_step_should_execute(moment: &UploadKeyAt, ctx: &crate::hive::node::Context) -> bool {
+    if ctx.no_keys {
+        return false;
+    }
+
+    if *moment == UploadKeyAt::AnyOpportunity && matches!(ctx.goal, Goal::Keys) {
+        return true;
+    }
+
+    matches!(
+        ctx.goal,
+        Goal::SwitchToConfiguration(SwitchToConfigurationGoal::Switch)
+    )
+}
+
+fn get_u32_permission(key: &Key) -> Result<u32, KeyError> {
+    u32::from_str_radix(&key.permissions, 8).map_err(KeyError::ParseKeyPermissions)
+}
+
+async fn create_reader(
+    source: &'_ Source,
+) -> Result<Pin<Box<dyn AsyncRead + Send + '_>>, KeyError> {
+    match source {
+        Source::Path(path) => Ok(Box::pin(File::open(path).await.map_err(KeyError::File)?)),
+        Source::String(string) => Ok(Box::pin(Cursor::new(string))),
+        Source::Command(args) => {
+            let output = Command::new(args.first().ok_or(KeyError::Empty)?)
+                .args(&args[1..])
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(KeyError::CommandSpawnError)?
+                .wait_with_output()
+                .await
+                .map_err(KeyError::CommandSpawnError)?;
+
+            if output.status.success() {
+                return Ok(Box::pin(Cursor::new(output.stdout)));
+            }
+
+            Err(KeyError::CommandError(
+                output.status,
+                from_utf8(&output.stderr).unwrap().to_string(),
+            ))
+        }
+    }
+}
 
 async fn copy_buffer<T: AsyncWriteExt + Unpin>(
     reader: &mut T,
@@ -75,12 +181,12 @@ async fn process_key(key: &Key) -> Result<(key_agent::keys::Key, Vec<u8>), KeyEr
     ))
 }
 
-pub struct UploadKeysToRemoteStep {
+pub struct KeysStep {
     pub moment: UploadKeyAt,
 }
 pub struct PushKeyAgentStep;
 
-impl Display for UploadKeysToRemoteStep {
+impl Display for KeysStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Upload key @ {:?}", self.moment)
     }
@@ -103,7 +209,7 @@ fn should_execute(moment: &UploadKeyAt, ctx: &Context) -> bool {
 }
 
 #[async_trait]
-impl ExecuteStep for UploadKeysToRemoteStep {
+impl ExecuteStep for KeysStep {
     fn should_execute(&self, ctx: &Context) -> bool {
         should_execute(&self.moment, ctx)
     }
