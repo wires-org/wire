@@ -10,7 +10,7 @@ use std::{io::Cursor, path::PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::{fs::File, io::AsyncRead};
-use tracing::{Span, debug, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::hive::node::{
     Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
@@ -18,14 +18,6 @@ use crate::hive::node::{
 use crate::{HiveLibError, create_ssh_command};
 
 use crate::hive::steps::keys::{Key, KeyError, Source, UploadKeyAt};
-
-pub trait PushKeys {
-    fn push_keys(
-        self,
-        target: UploadKeyAt,
-        span: &Span,
-    ) -> impl std::future::Future<Output = Result<(), HiveLibError>> + Send;
-}
 
 async fn create_reader(
     source: &'_ Source,
