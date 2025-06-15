@@ -74,12 +74,12 @@ pub struct Key {
     pub upload_at: UploadKeyAt,
 }
 
-fn key_step_should_execute(moment: &UploadKeyAt, ctx: &crate::hive::node::Context) -> bool {
+fn should_execute(filter: &UploadKeyAt, ctx: &crate::hive::node::Context) -> bool {
     if ctx.no_keys {
         return false;
     }
 
-    if *moment == UploadKeyAt::NoFilter && matches!(ctx.goal, Goal::Keys) {
+    if *filter == UploadKeyAt::NoFilter && matches!(ctx.goal, Goal::Keys) {
         return true;
     }
 
@@ -196,16 +196,6 @@ impl Display for PushKeyAgentStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Push the key agent")
     }
-}
-
-fn should_execute(moment: &UploadKeyAt, ctx: &Context) -> bool {
-    if !key_step_should_execute(moment, ctx) {
-        return false;
-    }
-
-    // excute step if node is not localhost
-    // !should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string())
-    true
 }
 
 #[async_trait]
