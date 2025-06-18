@@ -39,6 +39,7 @@ export default defineConfig({
           items: [
             { text: "What is Wire?", link: "/guide/wire" },
             { text: "Getting Started", link: "/guide/getting-started" },
+            { text: "Flakes", link: "/guide/flakes" },
             { text: "Targeting Nodes", link: "/guide/targeting" },
           ],
         },
@@ -90,6 +91,7 @@ export default defineConfig({
           nixos: "vscode-icons:file-type-nix",
           "configuration.nix": "vscode-icons:file-type-nix",
           "hive.nix": "vscode-icons:file-type-nix",
+          "flake.nix": "vscode-icons:file-type-nix",
           "module.nix": "vscode-icons:file-type-nix",
           home: localIconLoader(import.meta.url, "../assets/homemanager.svg"),
           ".conf": "vscode-icons:file-type-config",
