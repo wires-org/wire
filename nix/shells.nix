@@ -21,6 +21,7 @@
           pkgs.just
           pkgs.cargo-nextest
           pkgs.pnpm
+          pkgs.nodejs
         ];
 
         PROTOC = lib.getExe pkgs.protobuf;
