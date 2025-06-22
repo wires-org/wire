@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use tokio::process::Command;
-use tracing::{Instrument, info, instrument, warn};
+use tracing::{info, instrument, warn};
 
 use crate::{
     HiveLibError,
@@ -28,30 +27,13 @@ impl ExecuteStep for PingStep {
         loop {
             info!("Attempting host {}", ctx.node.target.get_preffered_host()?);
 
-            let mut command = Command::new("nix");
-
-            command
-                .args(["--extra-experimental-features", "nix-command"])
-                .arg("store")
-                .arg("ping")
-                .arg("--store")
-                .arg(format!(
-                    "ssh://{}@{}",
-                    ctx.node.target.user,
-                    ctx.node.target.get_preffered_host()?
-                ))
-                .env("NIX_SSHOPTS", format!("-p {}", ctx.node.target.port));
-
-            let (status, _stdout, _) = crate::nix::StreamTracing::execute(&mut command, true)
-                .in_current_span()
-                .await?;
-
-            if status.success() {
+            if ctx.node.ping().await.is_ok() {
                 return Ok(());
             }
 
             warn!(
                 "Failed to ping host {}",
+                // ? will take us out if we ran out of hosts
                 ctx.node.target.get_preffered_host()?
             );
             ctx.node.target.host_failed();
