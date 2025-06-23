@@ -65,7 +65,10 @@ impl ExecuteStep for SwitchToConfigurationStep {
             unreachable!("Cannot reach as guarded by should_execute")
         };
 
-        if !matches!(goal, SwitchToConfigurationGoal::DryActivate) {
+        if !matches!(
+            goal,
+            SwitchToConfigurationGoal::DryActivate | SwitchToConfigurationGoal::Boot
+        ) {
             info!("Setting profiles in anticipation for switch-to-configuration {goal}");
 
             let mut env_command =
