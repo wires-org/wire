@@ -7,9 +7,6 @@
       _wire.receiver = true;
     };
     testScript = ''
-      deployer_so = collect_store_objects(deployer)
-      receiver_so = collect_store_objects(receiver)
-
       with subtest("Test unreachable hosts"):
         deployer.fail(f"wire apply --on receiver-unreachable --no-progress --path {TEST_DIR}/hive.nix --no-keys -vvv >&2")
 
