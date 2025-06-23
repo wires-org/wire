@@ -19,10 +19,12 @@ makeHive {
 
   receiver-second = mkHiveNode { hostname = "receiver"; } {
     environment.etc."identity".text = "second";
+    deployment.target.host = "receiver";
   };
 
   receiver-third = mkHiveNode { hostname = "receiver"; } {
     environment.etc."identity".text = "third";
+    deployment.target.host = "receiver";
   };
 
   receiver-unreachable = mkHiveNode { hostname = "receiver"; } {
