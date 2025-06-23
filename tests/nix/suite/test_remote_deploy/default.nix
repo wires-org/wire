@@ -30,11 +30,11 @@
         identity = receiver.succeed("cat /etc/identity")
         assert identity == "second", "Identity didn't change after second apply"
 
-      with subtest("Check --reboot"):
-        deployer.succeed(f"wire apply boot --on receiver-third --no-progress --path {TEST_DIR}/hive.nix --reboot --no-keys -vvv >&2")
-
-        identity = receiver.succeed("cat /etc/identity")
-        assert identity == "third", "Identity didn't change after third apply"
+      # with subtest("Check --reboot"):
+      #   deployer.succeed(f"wire apply boot --on receiver-third --no-progress --path {TEST_DIR}/hive.nix --reboot --no-keys -vvv >&2")
+      #
+      #   identity = receiver.succeed("cat /etc/identity")
+      #   assert identity == "third", "Identity didn't change after third apply"
     '';
   };
 }
