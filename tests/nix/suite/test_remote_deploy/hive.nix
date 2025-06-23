@@ -3,8 +3,9 @@ let
 in
 makeHive {
   meta.nixpkgs = import <nixpkgs> { system = "x86_64-linux"; };
+
   receiver = mkHiveNode { hostname = "receiver"; } {
-    environment.etc."a".text = "b";
+    environment.etc."identity".text = "first";
 
     # test node pinging
     deployment.target.hosts = [
@@ -14,6 +15,14 @@ makeHive {
       "unreachable-4"
       "receiver"
     ];
+  };
+
+  receiver-second = mkHiveNode { hostname = "receiver"; } {
+    environment.etc."identity".text = "second";
+  };
+
+  receiver-third = mkHiveNode { hostname = "receiver"; } {
+    environment.etc."identity".text = "third";
   };
 
   receiver-unreachable = mkHiveNode { hostname = "receiver"; } {
