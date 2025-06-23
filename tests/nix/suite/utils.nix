@@ -20,18 +20,18 @@ in
         cfg
         (
           {
-            modulesPath,
+            lib,
             pkgs,
             ...
           }:
           let
             snakeOil = import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs;
+            inherit (import "${pkgs.path}/nixos/lib/testing" { inherit lib; }) testModules;
           in
           {
-            imports = [
-              "${modulesPath}/virtualisation/qemu-vm.nix"
-              "${modulesPath}/testing/test-instrumentation.nix"
+            imports = lib.flatten [
               flake.checks.${system}."vm-${testName}".nodes.${hostname}.system.build.networkConfig
+              testModules
             ];
 
             nixpkgs.hostPlatform = system;
