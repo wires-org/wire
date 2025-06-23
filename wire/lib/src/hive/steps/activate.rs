@@ -175,19 +175,22 @@ impl ExecuteStep for SwitchToConfigurationStep {
             .filter(|s| !s.is_empty())
             .collect();
 
+        warn!(
+            "Activation command for {name} exited unsuccessfully.",
+            name = ctx.name
+        );
+
         // Bail if the command couldn't of broken the system
-        if matches!(goal, SwitchToConfigurationGoal::DryActivate) {
+        // and don't try to regain connection to localhost
+        if matches!(goal, SwitchToConfigurationGoal::DryActivate)
+            || should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string())
+        {
             return Err(HiveLibError::SwitchToConfigurationError(
                 *goal,
                 ctx.name.clone(),
                 stderr,
             ));
         }
-
-        warn!(
-            "Activation command for {name} exited unsuccessfully.",
-            name = ctx.name
-        );
 
         if wait_for_ping(ctx).await.is_ok() {
             return Ok(());
