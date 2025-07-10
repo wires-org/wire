@@ -97,13 +97,41 @@ impl Default for Node {
     }
 }
 
-#[cfg(test)]
 impl Node {
+    #[cfg(test)]
     pub fn from_host(host: &str) -> Self {
         Node {
             target: Target::from_host(host),
             ..Default::default()
         }
+    }
+
+    pub async fn ping(&self) -> Result<(), HiveLibError> {
+        let mut command = Command::new("nix");
+
+        command
+            .args(["--extra-experimental-features", "nix-command"])
+            .arg("store")
+            .arg("ping")
+            .arg("--store")
+            .arg(format!(
+                "ssh://{}@{}",
+                self.target.user,
+                self.target.get_preffered_host()?
+            ))
+            .env("NIX_SSHOPTS", format!("-p {}", self.target.port));
+
+        let (status, _stdout, _) = crate::nix::StreamTracing::execute(&mut command, true)
+            .in_current_span()
+            .await?;
+
+        if status.success() {
+            return Ok(());
+        }
+
+        Err(HiveLibError::HostUnreachable(
+            self.target.get_preffered_host()?.to_string(),
+        ))
     }
 }
 
@@ -164,6 +192,7 @@ pub struct Context<'a> {
     pub no_keys: bool,
     pub state: StepState,
     pub goal: Goal,
+    pub reboot: bool,
 }
 
 pub struct GoalExecutor<'a> {

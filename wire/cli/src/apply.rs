@@ -62,6 +62,7 @@ pub async fn apply(
                 no_keys: args.no_keys,
                 hivepath: path,
                 modifiers,
+                reboot: args.reboot,
             };
 
             GoalExecutor::new(context)
