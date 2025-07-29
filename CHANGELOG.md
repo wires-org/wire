@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wire will now ping the node before it proceeds executing.
 - Wire will now properly respect `deployment.target.hosts`.
 - Wire will now attempt each target host in order until a valid one is found.
+- Added `--reboot`. Wire will wait for the node to reconnect after rebooting.
+  Wire will refuse to reboot localhost. Keys post-activation will be applied
+  after rebooting!
 
 ### Changed
 
@@ -23,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   You must now use `outputs.makeHive { ... }` instead of a raw attribute.
   This can be obtained with npins or a flake input.
 - The expected flake output name has changed from `outputs.colmena` to `outputs.wire`.
+- Wire will now wait for the node to reconnect if activation failed (excluding
+  dry-activate).
 
 ## [0.3.0] - 2025-06-20
 

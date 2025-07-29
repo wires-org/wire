@@ -2,7 +2,7 @@ use std::{fmt::Display, process::Output};
 
 use async_trait::async_trait;
 use tokio::process::Command;
-use tracing::{Instrument, info, instrument, warn};
+use tracing::{Instrument, error, info, instrument, warn};
 use tracing_indicatif::suspend_tracing_indicatif;
 
 use crate::{
@@ -28,6 +28,29 @@ pub(crate) fn get_elevation(reason: &str) -> Result<Output, HiveLibError> {
     .map_err(HiveLibError::FailedToElevate)
 }
 
+pub async fn wait_for_ping(ctx: &Context<'_>) -> Result<(), HiveLibError> {
+    for num in 0..3 {
+        warn!(
+            "Trying to ping {host} (attempt {num}/3)",
+            host = ctx.node.target.get_preffered_host()?
+        );
+
+        if ctx.node.ping().await.is_ok() {
+            info!(
+                "Regained connection to {name} via {host}",
+                name = ctx.name,
+                host = ctx.node.target.get_preffered_host()?
+            );
+
+            return Ok(());
+        }
+    }
+
+    Err(HiveLibError::HostUnreachable(
+        ctx.node.target.get_preffered_host()?.to_string(),
+    ))
+}
+
 #[async_trait]
 impl ExecuteStep for SwitchToConfigurationStep {
     fn should_execute(&self, ctx: &Context) -> bool {
@@ -42,7 +65,10 @@ impl ExecuteStep for SwitchToConfigurationStep {
             unreachable!("Cannot reach as guarded by should_execute")
         };
 
-        if !matches!(goal, SwitchToConfigurationGoal::DryActivate) {
+        if !matches!(
+            goal,
+            SwitchToConfigurationGoal::DryActivate | SwitchToConfigurationGoal::Boot
+        ) {
             info!("Setting profiles in anticipation for switch-to-configuration {goal}");
 
             let mut env_command =
@@ -107,9 +133,43 @@ impl ExecuteStep for SwitchToConfigurationStep {
         let (status, _, stderr_vec) = command.execute(true).in_current_span().await?;
 
         if status.success() {
-            info!("Done");
+            if !ctx.reboot {
+                return Ok(());
+            }
 
-            return Ok(());
+            if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
+                error!("Refusing to reboot local machine!");
+
+                return Ok(());
+            }
+
+            warn!("Rebooting {name}!", name = ctx.name);
+
+            let mut reboot = {
+                let mut command = create_ssh_command(&ctx.node.target, true)?;
+                command.args(["reboot", "now"]);
+                command
+            };
+
+            // consume result, impossible to know if the machine failed to reboot or we
+            // simply disconnected
+            let _ = reboot.output().await;
+
+            info!("Rebooted {name}, waiting to reconnect...", name = ctx.name);
+
+            if wait_for_ping(ctx).await.is_ok() {
+                return Ok(());
+            }
+
+            error!(
+                "Failed to get regain connection to {name} via {host} after reboot.",
+                name = ctx.name,
+                host = ctx.node.target.get_preffered_host()?
+            );
+
+            return Err(HiveLibError::HostUnreachableAfterReboot(
+                ctx.node.target.get_preffered_host()?.to_string(),
+            ));
         }
 
         let stderr: Vec<String> = stderr_vec
@@ -118,10 +178,37 @@ impl ExecuteStep for SwitchToConfigurationStep {
             .filter(|s| !s.is_empty())
             .collect();
 
-        Err(HiveLibError::SwitchToConfigurationError(
+        warn!(
+            "Activation command for {name} exited unsuccessfully.",
+            name = ctx.name
+        );
+
+        // Bail if the command couldn't of broken the system
+        // and don't try to regain connection to localhost
+        if matches!(goal, SwitchToConfigurationGoal::DryActivate)
+            || should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string())
+        {
+            return Err(HiveLibError::SwitchToConfigurationError(
+                *goal,
+                ctx.name.clone(),
+                stderr,
+            ));
+        }
+
+        if wait_for_ping(ctx).await.is_ok() {
+            return Ok(());
+        }
+
+        error!(
+            "Failed to get regain connection to {name} via {host} after {goal} activation.",
+            name = ctx.name,
+            host = ctx.node.target.get_preffered_host()?
+        );
+
+        return Err(HiveLibError::SwitchToConfigurationError(
             *goal,
             ctx.name.clone(),
             stderr,
-        ))
+        ));
     }
 }
