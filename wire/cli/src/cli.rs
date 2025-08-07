@@ -141,7 +141,7 @@ pub enum Goal {
 }
 
 impl TryFrom<Goal> for HiveGoal {
-    type Error = anyhow::Error;
+    type Error = miette::Error;
 
     fn try_from(value: Goal) -> Result<Self, Self::Error> {
         match value {

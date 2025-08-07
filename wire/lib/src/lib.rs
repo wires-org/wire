@@ -8,6 +8,7 @@ use hive::{
     node::{Name, SwitchToConfigurationGoal, Target},
     steps::keys::KeyError,
 };
+use miette::Diagnostic;
 use nix_log::{NixLog, Trace};
 use std::path::PathBuf;
 use thiserror::Error;
@@ -49,7 +50,7 @@ fn format_error_lines(lines: &[String]) -> String {
         .join("\n")
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Diagnostic, Error)]
 pub enum HiveLibError {
     #[error("no hive could be found in {}", .0.display())]
     NoHiveFound(PathBuf),

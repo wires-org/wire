@@ -2,13 +2,14 @@
 #![allow(clippy::missing_panics_doc)]
 use crate::cli::Cli;
 use crate::cli::ToSubCommandModifiers;
-use anyhow::Ok;
 use clap::CommandFactory;
 use clap::Parser;
 use clap_complete::generate;
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use indicatif::style::ProgressStyle;
 use lib::hive::Hive;
+use miette::IntoDiagnostic;
+use miette::Result;
 use tracing::warn;
 use tracing_indicatif::IndicatifLayer;
 use tracing_log::AsTrace;
@@ -27,7 +28,7 @@ mod cli;
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -49,7 +50,7 @@ async fn main() -> Result<(), anyhow::Error> {
         cli::Commands::Inspect { online: _, json } => println!("{}", {
             let hive = Hive::new_from_path(args.path.as_path(), modifiers).await?;
             if json {
-                serde_json::to_string(&hive)?
+                serde_json::to_string(&hive).into_diagnostic()?
             } else {
                 warn!("use --json to output something scripting suitable");
                 format!("{hive:#?}")
