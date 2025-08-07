@@ -1,4 +1,3 @@
-#![feature(let_chains)]
 #![deny(clippy::pedantic)]
 #![allow(
     clippy::missing_errors_doc,
@@ -112,8 +111,11 @@ pub enum HiveLibError {
     #[error("failed to elevate")]
     FailedToElevate(#[source] std::io::Error),
 
-    #[error("Cannot ping {0}:\n{lines}", lines = format_error_lines(.1))]
-    NodeUnreachable(Name, Vec<String>),
+    #[error("Cannot reach host {0}")]
+    HostUnreachable(String),
+
+    #[error("Cannot reach host {0} after reboot")]
+    HostUnreachableAfterReboot(String),
 
     #[error("Ran out of contactable hosts")]
     HostsExhausted,
