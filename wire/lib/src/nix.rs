@@ -10,7 +10,7 @@ use tracing_indicatif::span_ext::IndicatifSpanExt;
 use crate::hive::find_hive;
 use crate::hive::node::Name;
 use crate::nix_log::{Action, Internal, NixLog, Trace};
-use crate::{HiveLibError, SubCommandModifiers};
+use crate::{HiveInitializationError, HiveLibError, SubCommandModifiers};
 
 static DIGEST_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[0-9a-z]{32}").unwrap());
 
@@ -47,8 +47,10 @@ pub fn get_eval_command(
 ) -> Result<tokio::process::Command, HiveLibError> {
     assert!(check_nix_available(), "nix is not available on this system");
 
-    let canon_path = find_hive(&path.canonicalize().unwrap())
-        .ok_or(HiveLibError::NoHiveFound(path.to_path_buf()))?;
+    let canon_path =
+        find_hive(&path.canonicalize().unwrap()).ok_or(HiveLibError::HiveInitializationError(
+            HiveInitializationError::NoHiveFound(path.to_path_buf()),
+        ))?;
 
     let mut command = tokio::process::Command::new("nix");
     command.args(["--extra-experimental-features", "nix-command"]);

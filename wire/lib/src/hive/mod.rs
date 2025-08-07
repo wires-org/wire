@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, instrument, trace};
 
 use crate::nix::{EvalGoal, get_eval_command};
-use crate::{HiveLibError, SubCommandModifiers};
+use crate::{HiveInitializationError, HiveLibError, SubCommandModifiers};
 pub mod node;
 pub mod steps;
 
@@ -63,11 +63,13 @@ impl Hive {
             return Ok(hive);
         }
 
-        Err(HiveLibError::NixEvalError(
-            stderr
-                .split('\n')
-                .map(std::string::ToString::to_string)
-                .collect(),
+        Err(HiveLibError::HiveInitializationError(
+            HiveInitializationError::NixEvalError(
+                stderr
+                    .split('\n')
+                    .map(std::string::ToString::to_string)
+                    .collect(),
+            ),
         ))
     }
 

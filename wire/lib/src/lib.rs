@@ -51,15 +51,56 @@ fn format_error_lines(lines: &[String]) -> String {
 }
 
 #[derive(Debug, Diagnostic, Error)]
-pub enum HiveLibError {
-    #[error("no hive could be found in {}", .0.display())]
+pub enum HiveInitializationError {
+    #[diagnostic(
+        code(wire::HiveInit::NoHiveFound),
+        help(
+            "Double check the path is correct. You can adjust the hive path with `--path` when the hive lies outside of the CWD."
+        )
+    )]
+    #[error("No hive could be found in {}", .0.display())]
     NoHiveFound(PathBuf),
+
+    #[diagnostic(
+        code(wire::HiveInit::NixEvalError),
+        help("Check your hive is syntactically valid.")
+    )]
+    #[error("failed to evaluate your hive! last 20 lines:\n{}", format_error_lines(.0))]
+    NixEvalError(Vec<String>),
+}
+
+#[derive(Debug, Diagnostic, Error)]
+pub enum NetworkError {
+    #[diagnostic(
+        code(wire::Network::HostUnreachable),
+        help(
+            "If you failed due to a fault in DNS, note that a node can have multiple targets defined."
+        )
+    )]
+    #[error("Cannot reach host {0}")]
+    HostUnreachable(String),
+
+    #[diagnostic(code(wire::Network::HostUnreachableAfterReboot))]
+    #[error("Cannot reach host {0} after reboot")]
+    HostUnreachableAfterReboot(String),
+
+    #[diagnostic(code(wire::Network::HostsExhausted))]
+    #[error("Ran out of contactable hosts")]
+    HostsExhausted,
+}
+
+#[derive(Debug, Diagnostic, Error)]
+pub enum HiveLibError {
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    HiveInitializationError(HiveInitializationError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    NetworkError(NetworkError),
 
     #[error("failed to execute nix command")]
     NixExecError(#[source] tokio::io::Error),
-
-    #[error("failed to evaluate your hive! is it valid? (last 20 lines):\n{}", format_error_lines(.0))]
-    NixEvalError(Vec<String>),
 
     #[error(
         "failed to evaluate node {0} (filtered logs, run with -vvv to see all):\n{log}",
@@ -111,15 +152,6 @@ pub enum HiveLibError {
 
     #[error("failed to elevate")]
     FailedToElevate(#[source] std::io::Error),
-
-    #[error("Cannot reach host {0}")]
-    HostUnreachable(String),
-
-    #[error("Cannot reach host {0} after reboot")]
-    HostUnreachableAfterReboot(String),
-
-    #[error("Ran out of contactable hosts")]
-    HostsExhausted,
 }
 
 #[derive(Debug, Default, Clone, Copy)]

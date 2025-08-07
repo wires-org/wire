@@ -9,10 +9,10 @@ use tokio::process::Command;
 use tracing::{Instrument, Span, error, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
-use crate::SubCommandModifiers;
 use crate::hive::steps::keys::{Key, KeysStep, PushKeyAgentStep, UploadKeyAt};
 use crate::hive::steps::ping::PingStep;
 use crate::nix::StreamTracing;
+use crate::{NetworkError, SubCommandModifiers};
 
 use super::HiveLibError;
 use super::steps::activate::SwitchToConfigurationStep;
@@ -46,7 +46,7 @@ impl Target {
     pub fn get_preffered_host(&self) -> Result<&Arc<str>, HiveLibError> {
         self.hosts
             .get(self.current_host)
-            .ok_or(HiveLibError::HostsExhausted)
+            .ok_or(HiveLibError::NetworkError(NetworkError::HostsExhausted))
     }
 
     pub fn host_failed(&mut self) {
@@ -129,9 +129,9 @@ impl Node {
             return Ok(());
         }
 
-        Err(HiveLibError::HostUnreachable(
+        Err(HiveLibError::NetworkError(NetworkError::HostUnreachable(
             self.target.get_preffered_host()?.to_string(),
-        ))
+        )))
     }
 }
 

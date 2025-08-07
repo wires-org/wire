@@ -6,7 +6,7 @@ use tracing::{Instrument, error, info, instrument, warn};
 use tracing_indicatif::suspend_tracing_indicatif;
 
 use crate::{
-    HiveLibError, create_ssh_command,
+    HiveLibError, NetworkError, create_ssh_command,
     hive::node::{Context, ExecuteStep, Goal, SwitchToConfigurationGoal, should_apply_locally},
     nix::StreamTracing,
 };
@@ -46,9 +46,9 @@ pub async fn wait_for_ping(ctx: &Context<'_>) -> Result<(), HiveLibError> {
         }
     }
 
-    Err(HiveLibError::HostUnreachable(
+    Err(HiveLibError::NetworkError(NetworkError::HostUnreachable(
         ctx.node.target.get_preffered_host()?.to_string(),
-    ))
+    )))
 }
 
 #[async_trait]
@@ -167,8 +167,10 @@ impl ExecuteStep for SwitchToConfigurationStep {
                 host = ctx.node.target.get_preffered_host()?
             );
 
-            return Err(HiveLibError::HostUnreachableAfterReboot(
-                ctx.node.target.get_preffered_host()?.to_string(),
+            return Err(HiveLibError::NetworkError(
+                NetworkError::HostUnreachableAfterReboot(
+                    ctx.node.target.get_preffered_host()?.to_string(),
+                ),
             ));
         }
 
