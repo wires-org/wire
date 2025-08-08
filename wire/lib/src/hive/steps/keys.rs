@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use futures::future::join_all;
+use miette::Diagnostic;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -21,20 +22,31 @@ use crate::hive::node::{
 use crate::hive::steps::activate::get_elevation;
 use crate::{HiveLibError, create_ssh_command};
 
-#[derive(Debug, Error)]
+#[derive(Debug, Diagnostic, Error)]
 pub enum KeyError {
+    #[diagnostic(code(wire::Key::File))]
     #[error("error reading file")]
     File(#[source] std::io::Error),
 
-    #[error("error spawning command")]
-    CommandSpawnError(#[source] std::io::Error),
+    #[diagnostic(
+        code(wire::Key::SpawningCommand),
+        help("Ensure wire has the correct $PATH for this command")
+    )]
+    #[error("error spawning command {:?}", .1)]
+    CommandSpawnError(#[source] std::io::Error, Vec<String>),
 
+    #[diagnostic(code(wire::Key::CommandExit))]
     #[error("key command failed with status {}: {}", .0,.1)]
     CommandError(ExitStatus, String),
 
+    #[diagnostic(code(wire::Key::Empty))]
     #[error("Command list empty")]
     Empty,
 
+    #[diagnostic(
+        code(wire::Key::ParseKeyPermissions),
+        help("Refer to the documentation for the format of key file permissions.")
+    )]
     #[error("Failed to parse key permissions")]
     ParseKeyPermissions(#[source] ParseIntError),
 }
@@ -105,10 +117,10 @@ async fn create_reader(
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
-                .map_err(KeyError::CommandSpawnError)?
+                .map_err(|x| KeyError::CommandSpawnError(x, args.clone()))?
                 .wait_with_output()
                 .await
-                .map_err(KeyError::CommandSpawnError)?;
+                .map_err(|x| KeyError::CommandSpawnError(x, args.clone()))?;
 
             if output.status.success() {
                 return Ok(Box::pin(Cursor::new(output.stdout)));
@@ -214,13 +226,16 @@ impl ExecuteStep for KeysStep {
                 self.filter == UploadKeyAt::NoFilter
                     || (self.filter != UploadKeyAt::NoFilter && key.upload_at != self.filter)
             })
-            .map(|key| async move { process_key(key).await });
+            .map(|key| async move {
+                process_key(key)
+                    .await
+                    .map_err(|err| HiveLibError::KeyError(key.name.clone(), err))
+            });
 
         let (keys, bufs): (Vec<key_agent::keys::Key>, Vec<Vec<u8>>) = join_all(futures)
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, KeyError>>()
-            .map_err(HiveLibError::KeyError)?
+            .collect::<Result<Vec<_>, HiveLibError>>()?
             .into_iter()
             .unzip();
 
@@ -233,7 +248,7 @@ impl ExecuteStep for KeysStep {
         let mut command =
             if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
                 warn!("Placing keys locally for node {0}", ctx.name);
-                get_elevation("wire key agent")?;
+                get_elevation("wire key agent").map_err(HiveLibError::ActivationError)?;
                 Command::new("sudo")
             } else {
                 create_ssh_command(&ctx.node.target, true)?

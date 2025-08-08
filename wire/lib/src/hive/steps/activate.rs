@@ -1,13 +1,17 @@
 use std::{fmt::Display, process::Output};
 
 use async_trait::async_trait;
+use miette::Diagnostic;
+use thiserror::Error;
 use tokio::process::Command;
 use tracing::{Instrument, error, info, instrument, warn};
 use tracing_indicatif::suspend_tracing_indicatif;
 
 use crate::{
-    HiveLibError, NetworkError, create_ssh_command,
-    hive::node::{Context, ExecuteStep, Goal, SwitchToConfigurationGoal, should_apply_locally},
+    HiveLibError, NetworkError, create_ssh_command, format_error_lines,
+    hive::node::{
+        Context, ExecuteStep, Goal, Name, SwitchToConfigurationGoal, should_apply_locally,
+    },
     nix::StreamTracing,
 };
 
@@ -19,13 +23,24 @@ impl Display for SwitchToConfigurationStep {
     }
 }
 
-pub(crate) fn get_elevation(reason: &str) -> Result<Output, HiveLibError> {
+#[derive(Debug, Diagnostic, Error)]
+pub enum ActivationError {
+    #[diagnostic(code(wire::Activation::SwitchToConfiguration))]
+    #[error("failed to run switch-to-configuration {0} on node {1} (last 20 lines):\n{lines}", lines = format_error_lines(.2))]
+    SwitchToConfigurationError(SwitchToConfigurationGoal, Name, Vec<String>),
+
+    #[diagnostic(code(wire::Activation::Elevate))]
+    #[error("failed to elevate")]
+    FailedToElevate(#[source] std::io::Error),
+}
+
+pub(crate) fn get_elevation(reason: &str) -> Result<Output, ActivationError> {
     info!("Attempting to elevate for {reason}.");
     suspend_tracing_indicatif(|| {
         let mut command = std::process::Command::new("sudo");
         command.arg("-v").output()
     })
-    .map_err(HiveLibError::FailedToElevate)
+    .map_err(ActivationError::FailedToElevate)
 }
 
 pub async fn wait_for_ping(ctx: &Context<'_>) -> Result<(), HiveLibError> {
@@ -75,7 +90,7 @@ impl ExecuteStep for SwitchToConfigurationStep {
                 if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
                     // Refresh sudo timeout
                     warn!("Running nix-env ON THIS MACHINE for node {0}", ctx.name);
-                    get_elevation("nix-env")?;
+                    get_elevation("nix-env").map_err(HiveLibError::ActivationError)?;
                     let mut command = Command::new("sudo");
                     command.arg("nix-env");
                     command
@@ -113,7 +128,7 @@ impl ExecuteStep for SwitchToConfigurationStep {
                     "Running switch-to-configuration {goal:?} ON THIS MACHINE for node {0}",
                     ctx.name
                 );
-                get_elevation("switch-to-configuration")?;
+                get_elevation("switch-to-configuration").map_err(HiveLibError::ActivationError)?;
                 let mut command = Command::new("sudo");
                 command.arg(cmd);
                 command
@@ -190,10 +205,8 @@ impl ExecuteStep for SwitchToConfigurationStep {
         if matches!(goal, SwitchToConfigurationGoal::DryActivate)
             || should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string())
         {
-            return Err(HiveLibError::SwitchToConfigurationError(
-                *goal,
-                ctx.name.clone(),
-                stderr,
+            return Err(HiveLibError::ActivationError(
+                ActivationError::SwitchToConfigurationError(*goal, ctx.name.clone(), stderr),
             ));
         }
 
@@ -207,10 +220,8 @@ impl ExecuteStep for SwitchToConfigurationStep {
             host = ctx.node.target.get_preffered_host()?
         );
 
-        return Err(HiveLibError::SwitchToConfigurationError(
-            *goal,
-            ctx.name.clone(),
-            stderr,
+        return Err(HiveLibError::ActivationError(
+            ActivationError::SwitchToConfigurationError(*goal, ctx.name.clone(), stderr),
         ));
     }
 }

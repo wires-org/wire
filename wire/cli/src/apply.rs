@@ -15,7 +15,12 @@ use crate::cli::{ApplyArgs, ApplyTarget};
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("node {} failed to apply", .0)]
-struct NodeError(Name, #[source] HiveLibError);
+struct NodeError(
+    Name,
+    #[source]
+    #[diagnostic_source]
+    HiveLibError,
+);
 
 #[derive(Debug, Error, Diagnostic)]
 #[error("{} node(s) failed to apply.", .0.len())]
