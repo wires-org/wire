@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::future::join_all;
-use miette::Diagnostic;
+use miette::{Diagnostic, SourceSpan};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -32,8 +32,27 @@ pub enum KeyError {
         code(wire::Key::SpawningCommand),
         help("Ensure wire has the correct $PATH for this command")
     )]
-    #[error("error spawning command {:?}", .1)]
-    CommandSpawnError(#[source] std::io::Error, Vec<String>),
+    #[error("error spawning key command")]
+    CommandSpawnError {
+        #[source]
+        error: std::io::Error,
+
+        #[source_code]
+        command: String,
+
+        #[label(primary, "Program ran")]
+        command_span: Option<SourceSpan>,
+    },
+
+    #[diagnostic(code(wire::Key::ResolvingChild))]
+    #[error("Error resolving key command child process")]
+    CommandResolveError {
+        #[source]
+        error: std::io::Error,
+
+        #[source_code]
+        command: String,
+    },
 
     #[diagnostic(code(wire::Key::CommandExit))]
     #[error("key command failed with status {}: {}", .0,.1)]
@@ -117,10 +136,17 @@ async fn create_reader(
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
-                .map_err(|x| KeyError::CommandSpawnError(x, args.clone()))?
+                .map_err(|err| KeyError::CommandSpawnError {
+                    error: err,
+                    command: args.join(" "),
+                    command_span: Some((0..args.first().unwrap().len()).into()),
+                })?
                 .wait_with_output()
                 .await
-                .map_err(|x| KeyError::CommandSpawnError(x, args.clone()))?;
+                .map_err(|err| KeyError::CommandResolveError {
+                    error: err,
+                    command: args.join(" "),
+                })?;
 
             if output.status.success() {
                 return Ok(Box::pin(Cursor::new(output.stdout)));
