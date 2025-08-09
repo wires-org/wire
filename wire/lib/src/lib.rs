@@ -12,9 +12,15 @@ use miette::Diagnostic;
 use nix_log::{NixLog, Trace};
 use std::path::PathBuf;
 use thiserror::Error;
-use tokio::{process::Command, task::JoinError};
+use tokio::process::Command;
 
-use crate::hive::steps::activate::ActivationError;
+use crate::{
+    hive::{
+        node::Push,
+        steps::{activate::ActivationError, keys::KeyAgentError},
+    },
+    nix::NixChildError,
+};
 
 pub mod hive;
 mod nix;
@@ -69,6 +75,17 @@ pub enum HiveInitializationError {
     )]
     #[error("failed to evaluate your hive! last 20 lines:\n{}", format_error_lines(.0))]
     NixEvalError(Vec<String>),
+
+    #[diagnostic(code(wire::HiveInit::Parse), help("Please create an issue!"))]
+    #[error("Failed to parse internal wire json.")]
+    ParseEvaluateError(#[source] serde_json::Error),
+
+    #[diagnostic(
+        code(wire::HiveInit::NodeDoesNotExist),
+        help("Please create an issue!")
+    )]
+    #[error("node {0} not exist in hive")]
+    NodeDoesNotExist(String),
 }
 
 #[derive(Debug, Diagnostic, Error)]
@@ -113,50 +130,40 @@ pub enum HiveLibError {
         KeyError,
     ),
 
-    #[error("failed to execute nix command")]
-    NixExecError(#[source] tokio::io::Error),
+    #[error("Wire key-agent failed")]
+    KeyAgentError(
+        #[source]
+        #[diagnostic_source]
+        KeyAgentError,
+    ),
 
-    #[diagnostic(code(wire::Activation::EvalInternal))]
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    NixChildError(NixChildError),
+
+    #[diagnostic(code(wire::EvaluateNode))]
     #[error(
         "failed to evaluate node {0} (filtered logs, run with -vvv to see all):\n{log}",
         log = .1.iter().filter(|l| l.is_error()).map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n"))
     ]
     NixEvalInternalError(Name, Vec<NixLog>),
 
-    #[diagnostic(code(wire::Activation::Build))]
+    #[diagnostic(code(wire::BuildNode))]
     #[error("failed to build node {0} (last 20 lines):\n{lines}", lines = format_error_lines(.1))]
     NixBuildError(Name, Vec<String>),
 
+    #[diagnostic(code(wire::CopyPath))]
     #[error(
-        "failed to copy drv to node {0} (filtered logs, run with -vvv to see all):\n{log}", 
-        log = .1.iter().filter(|l| l.is_error()).map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n"))
+        "failed to copy path {path} to node {name} (filtered logs, run with -vvv to see all):\n{log}", 
+        log = logs.iter().filter(|l| l.is_error()).map(std::string::ToString::to_string).collect::<Vec<String>>().join("\n"))
     ]
-    NixCopyError(Name, Vec<NixLog>),
+    NixCopyError {
+        name: Name,
+        path: String,
+        logs: Vec<NixLog>,
+    },
 
-    #[error("failed to run nix-env on node {0} (last 20 lines):\n{lines}", lines = format_error_lines(.1))]
-    NixEnvError(Name, Vec<String>),
-
-    #[error("failed to push keys to {0} (last 20 lines):\n{lines}", lines = format_error_lines(.1))]
-    KeyCommandError(Name, Vec<String>),
-
-    #[error("node {0} not exist in hive")]
-    NodeDoesNotExist(String),
-
-    #[error("failed to execute command")]
-    SpawnFailed(#[source] tokio::io::Error),
-
-    #[error("failed to join task")]
-    JoinError(#[source] JoinError),
-
-    #[error("there was no handle to io on the child process")]
-    NoHandle,
-
-    #[error("failed to parse nix log \"{0}\"")]
-    ParseLogError(String, #[source] serde_json::Error),
-
-    #[error("failed to parse internal wire json. please create an issue!")]
-    ParseEvaluateError(#[source] serde_json::Error),
-
+    #[diagnostic(code(wire::BufferOperation))]
     #[error("an operation failed in regards to buffers")]
     BufferOperationError(#[source] tokio::io::Error),
 }

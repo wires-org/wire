@@ -32,6 +32,10 @@ pub enum ActivationError {
     #[diagnostic(code(wire::Activation::Elevate))]
     #[error("failed to elevate")]
     FailedToElevate(#[source] std::io::Error),
+
+    #[diagnostic(code(wire::Activation::NixEnv))]
+    #[error("failed to run nix-env on node {0} (last 20 lines):\n{lines}", lines = format_error_lines(.1))]
+    NixEnvError(Name, Vec<String>),
 }
 
 pub(crate) fn get_elevation(reason: &str) -> Result<Output, ActivationError> {
@@ -111,7 +115,10 @@ impl ExecuteStep for SwitchToConfigurationStep {
                     .filter(|s| !s.is_empty())
                     .collect();
 
-                return Err(HiveLibError::NixEnvError(ctx.name.clone(), stderr));
+                return Err(HiveLibError::ActivationError(ActivationError::NixEnvError(
+                    ctx.name.clone(),
+                    stderr,
+                )));
             }
 
             info!("Set system profile");

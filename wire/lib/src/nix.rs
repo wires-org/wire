@@ -1,7 +1,9 @@
+use miette::Diagnostic;
 use regex::Regex;
 use std::path::Path;
 use std::process::{Command, ExitStatus};
 use std::sync::LazyLock;
+use thiserror::Error;
 use tokio::io::BufReader;
 use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tracing::{Instrument, Span, error, info, trace};
@@ -17,6 +19,34 @@ static DIGEST_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[0-9a-z]{32}")
 pub enum EvalGoal<'a> {
     Inspect,
     GetTopLevel(&'a Name),
+}
+
+#[derive(Debug, Diagnostic, Error)]
+pub enum NixChildError {
+    #[diagnostic(
+        code(wire::NixChild::JoiningTasks),
+        help("This should never happen, please create an issue!")
+    )]
+    #[error("Could not join nix logging task")]
+    JoinError(#[source] tokio::task::JoinError),
+
+    #[diagnostic(
+        code(wire::NixChild::NoHandle),
+        help("This should never happen, please create an issue!")
+    )]
+    #[error("There was no handle to io on the child process")]
+    NoHandle,
+
+    #[diagnostic(
+        code(wire::NixChild::SpawnFailed),
+        help("Please run wire under a host with nix installed.")
+    )]
+    #[error("failed to execute nix")]
+    SpawnFailed(#[source] tokio::io::Error),
+
+    #[diagnostic(code(wire::NixChild::Resolving))]
+    #[error("Error resolving nix child process")]
+    ResolveError(#[source] std::io::Error),
 }
 
 fn check_nix_available() -> bool {
@@ -94,7 +124,7 @@ where
     while let Some(line) = io_reader
         .next_line()
         .await
-        .map_err(HiveLibError::SpawnFailed)?
+        .map_err(|err| HiveLibError::NixChildError(NixChildError::SpawnFailed(err)))?
     {
         let log = serde_json::from_str::<Internal>(line.strip_prefix("@nix ").unwrap_or(&line))
             .map(NixLog::Internal)
@@ -144,19 +174,29 @@ impl StreamTracing for tokio::process::Command {
             .stderr(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .spawn()
-            .map_err(HiveLibError::SpawnFailed)?;
+            .map_err(|err| HiveLibError::NixChildError(NixChildError::SpawnFailed(err)))?;
 
-        let stdout_handle = child.stdout.take().ok_or(HiveLibError::NoHandle)?;
-        let stderr_handle = child.stderr.take().ok_or(HiveLibError::NoHandle)?;
+        let stdout_handle = child
+            .stdout
+            .take()
+            .ok_or(HiveLibError::NixChildError(NixChildError::NoHandle))?;
+        let stderr_handle = child
+            .stderr
+            .take()
+            .ok_or(HiveLibError::NixChildError(NixChildError::NoHandle))?;
 
         let stderr_task = tokio::spawn(handle_io(stderr_handle, log_stderr).in_current_span());
         let stdout_task = tokio::spawn(handle_io(stdout_handle, false));
 
-        let handle =
-            tokio::spawn(async move { child.wait().await.map_err(HiveLibError::SpawnFailed) });
+        let handle = tokio::spawn(async move {
+            child
+                .wait()
+                .await
+                .map_err(|err| HiveLibError::NixChildError(NixChildError::SpawnFailed(err)))
+        });
 
-        let (result, stdout, stderr) =
-            tokio::try_join!(handle, stdout_task, stderr_task).map_err(HiveLibError::JoinError)?;
+        let (result, stdout, stderr) = tokio::try_join!(handle, stdout_task, stderr_task)
+            .map_err(|err| HiveLibError::NixChildError(NixChildError::JoinError(err)))?;
 
         Ok((result?, stdout?, stderr?))
     }

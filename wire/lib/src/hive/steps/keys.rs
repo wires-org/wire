@@ -17,10 +17,10 @@ use tokio::{fs::File, io::AsyncRead};
 use tracing::{debug, info, trace, warn};
 
 use crate::hive::node::{
-    Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
+    Context, ExecuteStep, Goal, Name, Push, SwitchToConfigurationGoal, push, should_apply_locally,
 };
 use crate::hive::steps::activate::get_elevation;
-use crate::{HiveLibError, create_ssh_command};
+use crate::{HiveLibError, create_ssh_command, format_error_lines};
 
 #[derive(Debug, Diagnostic, Error)]
 pub enum KeyError {
@@ -44,7 +44,7 @@ pub enum KeyError {
         command_span: Option<SourceSpan>,
     },
 
-    #[diagnostic(code(wire::Key::ResolvingChild))]
+    #[diagnostic(code(wire::Key::Resolving))]
     #[error("Error resolving key command child process")]
     CommandResolveError {
         #[source]
@@ -68,6 +68,24 @@ pub enum KeyError {
     )]
     #[error("Failed to parse key permissions")]
     ParseKeyPermissions(#[source] ParseIntError),
+}
+
+#[derive(Debug, Diagnostic, Error)]
+pub enum KeyAgentError {
+    #[diagnostic(code(wire::KeyAgent::SpawningAgent), help("Please create an issue!"))]
+    #[error("Error spawning key agent")]
+    SpawningAgent(#[source] std::io::Error),
+
+    #[diagnostic(code(wire::KeyAgent::Resolving), help("Please create an issue!"))]
+    #[error("Error resolving key agent child process")]
+    ResolvingError(#[source] std::io::Error),
+
+    #[diagnostic(
+        code(wire::KeyAgent::Fail),
+        help("If you suspect the reason is wire's fault, please create an issue!")
+    )]
+    #[error("failed to push keys (last 20 lines):\n{lines}", lines = format_error_lines(.1))]
+    AgentFailed(Name, Vec<String>),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
@@ -289,7 +307,7 @@ impl ExecuteStep for KeysStep {
             .stderr(Stdio::piped())
             .stdin(Stdio::piped())
             .spawn()
-            .map_err(HiveLibError::SpawnFailed)?;
+            .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::SpawningAgent(err)))?;
 
         // take() stdin so it will be dropped out of block
         if let Some(mut stdin) = child.stdin.take() {
@@ -301,7 +319,7 @@ impl ExecuteStep for KeysStep {
         let output = child
             .wait_with_output()
             .await
-            .map_err(HiveLibError::SpawnFailed)?;
+            .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::ResolvingError(err)))?;
 
         if output.status.success() {
             info!("Successfully pushed keys to {}", ctx.name);
@@ -312,13 +330,13 @@ impl ExecuteStep for KeysStep {
 
         let stderr = String::from_utf8_lossy(&output.stderr);
 
-        Err(HiveLibError::KeyCommandError(
+        Err(HiveLibError::KeyAgentError(KeyAgentError::AgentFailed(
             ctx.name.clone(),
             stderr
                 .split('\n')
                 .map(std::string::ToString::to_string)
                 .collect(),
-        ))
+        )))
     }
 }
 

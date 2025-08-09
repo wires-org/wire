@@ -273,7 +273,11 @@ pub async fn push(node: &Node, name: &Name, push: Push<'_>) -> Result<(), HiveLi
     let (status, _stdout, stderr_vec) = command.execute(true).in_current_span().await?;
 
     if !status.success() {
-        return Err(HiveLibError::NixCopyError(name.clone(), stderr_vec));
+        return Err(HiveLibError::NixCopyError {
+            name: name.clone(),
+            logs: stderr_vec,
+            path: push.to_string(),
+        });
     }
 
     Ok(())
