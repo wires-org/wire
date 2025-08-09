@@ -7,8 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, trace};
 
-use crate::nix::{EvalGoal, NixChildError, get_eval_command};
-use crate::{HiveInitializationError, HiveLibError, SubCommandModifiers};
+use crate::errors::{HiveInitializationError, NixChildError};
+use crate::nix::{EvalGoal, get_eval_command};
+use crate::{HiveLibError, SubCommandModifiers};
 pub mod node;
 pub mod steps;
 

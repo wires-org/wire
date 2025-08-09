@@ -57,12 +57,9 @@
         };
 
         wire-dignostics-md = self'.packages.wire-unwrapped.overrideAttrs {
-          DIAGNOSTICS_MD_OUTPUT = "./diagnostics";
-          preBuild = ''
-            mkdir -p ./diagnostics
-          '';
+          DIAGNOSTICS_MD_OUTPUT = "/build/source";
           installPhase = ''
-            mv ./diagnostics/DIAGNOSTICS.md $out
+            mv /build/source/DIAGNOSTICS.md $out
           '';
         };
       };

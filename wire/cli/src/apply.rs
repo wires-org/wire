@@ -3,7 +3,7 @@ use indicatif::ProgressStyle;
 use itertools::{Either, Itertools};
 use lib::hive::Hive;
 use lib::hive::node::{Context, GoalExecutor, Name, StepState};
-use lib::{HiveLibError, SubCommandModifiers};
+use lib::{SubCommandModifiers, errors::HiveLibError};
 use miette::{Diagnostic, Result};
 use std::collections::HashSet;
 use std::path::PathBuf;

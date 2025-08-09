@@ -1,17 +1,14 @@
 use std::{fmt::Display, process::Output};
 
 use async_trait::async_trait;
-use miette::Diagnostic;
-use thiserror::Error;
 use tokio::process::Command;
 use tracing::{Instrument, error, info, instrument, warn};
 use tracing_indicatif::suspend_tracing_indicatif;
 
 use crate::{
-    HiveLibError, NetworkError, create_ssh_command, format_error_lines,
-    hive::node::{
-        Context, ExecuteStep, Goal, Name, SwitchToConfigurationGoal, should_apply_locally,
-    },
+    HiveLibError, create_ssh_command,
+    errors::{ActivationError, NetworkError},
+    hive::node::{Context, ExecuteStep, Goal, SwitchToConfigurationGoal, should_apply_locally},
     nix::StreamTracing,
 };
 
@@ -21,21 +18,6 @@ impl Display for SwitchToConfigurationStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Switch to configuration")
     }
-}
-
-#[derive(Debug, Diagnostic, Error)]
-pub enum ActivationError {
-    #[diagnostic(code(wire::Activation::SwitchToConfiguration))]
-    #[error("failed to run switch-to-configuration {0} on node {1} (last 20 lines):\n{lines}", lines = format_error_lines(.2))]
-    SwitchToConfigurationError(SwitchToConfigurationGoal, Name, Vec<String>),
-
-    #[diagnostic(code(wire::Activation::Elevate))]
-    #[error("failed to elevate")]
-    FailedToElevate(#[source] std::io::Error),
-
-    #[diagnostic(code(wire::Activation::NixEnv))]
-    #[error("failed to run nix-env on node {0} (last 20 lines):\n{lines}", lines = format_error_lines(.1))]
-    NixEnvError(Name, Vec<String>),
 }
 
 pub(crate) fn get_elevation(reason: &str) -> Result<Output, ActivationError> {

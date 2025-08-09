@@ -9,10 +9,11 @@ use tokio::process::Command;
 use tracing::{Instrument, Span, error, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
+use crate::SubCommandModifiers;
+use crate::errors::NetworkError;
 use crate::hive::steps::keys::{Key, KeysStep, PushKeyAgentStep, UploadKeyAt};
 use crate::hive::steps::ping::PingStep;
 use crate::nix::StreamTracing;
-use crate::{NetworkError, SubCommandModifiers};
 
 use super::HiveLibError;
 use super::steps::activate::SwitchToConfigurationStep;

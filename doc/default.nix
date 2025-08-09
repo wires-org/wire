@@ -6,6 +6,8 @@
       ...
     }:
     {
-      packages.docs = pkgs.callPackage ./package.nix { inherit (self'.packages) wire-small; };
+      packages.docs = pkgs.callPackage ./package.nix {
+        inherit (self'.packages) wire-small wire-dignostics-md;
+      };
     };
 }

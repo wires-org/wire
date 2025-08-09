@@ -1,52 +1,23 @@
-use miette::Diagnostic;
 use regex::Regex;
 use std::path::Path;
 use std::process::{Command, ExitStatus};
 use std::sync::LazyLock;
-use thiserror::Error;
 use tokio::io::BufReader;
 use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tracing::{Instrument, Span, error, info, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
+use crate::errors::{HiveInitializationError, NixChildError};
 use crate::hive::find_hive;
 use crate::hive::node::Name;
 use crate::nix_log::{Action, Internal, NixLog, Trace};
-use crate::{HiveInitializationError, HiveLibError, SubCommandModifiers};
+use crate::{HiveLibError, SubCommandModifiers};
 
 static DIGEST_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[0-9a-z]{32}").unwrap());
 
 pub enum EvalGoal<'a> {
     Inspect,
     GetTopLevel(&'a Name),
-}
-
-#[derive(Debug, Diagnostic, Error)]
-pub enum NixChildError {
-    #[diagnostic(
-        code(wire::NixChild::JoiningTasks),
-        help("This should never happen, please create an issue!")
-    )]
-    #[error("Could not join nix logging task")]
-    JoinError(#[source] tokio::task::JoinError),
-
-    #[diagnostic(
-        code(wire::NixChild::NoHandle),
-        help("This should never happen, please create an issue!")
-    )]
-    #[error("There was no handle to io on the child process")]
-    NoHandle,
-
-    #[diagnostic(
-        code(wire::NixChild::SpawnFailed),
-        help("Please run wire under a host with nix installed.")
-    )]
-    #[error("failed to execute nix")]
-    SpawnFailed(#[source] tokio::io::Error),
-
-    #[diagnostic(code(wire::NixChild::Resolving))]
-    #[error("Error resolving nix child process")]
-    ResolveError(#[source] std::io::Error),
 }
 
 fn check_nix_available() -> bool {

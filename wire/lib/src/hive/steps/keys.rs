@@ -1,92 +1,25 @@
 use async_trait::async_trait;
 use futures::future::join_all;
-use miette::{Diagnostic, SourceSpan};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::Display;
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::pin::Pin;
-use std::process::{ExitStatus, Stdio};
+use std::process::Stdio;
 use std::str::from_utf8;
-use std::{num::ParseIntError, path::PathBuf};
-use thiserror::Error;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::{fs::File, io::AsyncRead};
 use tracing::{debug, info, trace, warn};
 
+use crate::errors::{KeyAgentError, KeyError};
 use crate::hive::node::{
-    Context, ExecuteStep, Goal, Name, Push, SwitchToConfigurationGoal, push, should_apply_locally,
+    Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
 };
 use crate::hive::steps::activate::get_elevation;
-use crate::{HiveLibError, create_ssh_command, format_error_lines};
-
-#[derive(Debug, Diagnostic, Error)]
-pub enum KeyError {
-    #[diagnostic(code(wire::Key::File))]
-    #[error("error reading file")]
-    File(#[source] std::io::Error),
-
-    #[diagnostic(
-        code(wire::Key::SpawningCommand),
-        help("Ensure wire has the correct $PATH for this command")
-    )]
-    #[error("error spawning key command")]
-    CommandSpawnError {
-        #[source]
-        error: std::io::Error,
-
-        #[source_code]
-        command: String,
-
-        #[label(primary, "Program ran")]
-        command_span: Option<SourceSpan>,
-    },
-
-    #[diagnostic(code(wire::Key::Resolving))]
-    #[error("Error resolving key command child process")]
-    CommandResolveError {
-        #[source]
-        error: std::io::Error,
-
-        #[source_code]
-        command: String,
-    },
-
-    #[diagnostic(code(wire::Key::CommandExit))]
-    #[error("key command failed with status {}: {}", .0,.1)]
-    CommandError(ExitStatus, String),
-
-    #[diagnostic(code(wire::Key::Empty))]
-    #[error("Command list empty")]
-    Empty,
-
-    #[diagnostic(
-        code(wire::Key::ParseKeyPermissions),
-        help("Refer to the documentation for the format of key file permissions.")
-    )]
-    #[error("Failed to parse key permissions")]
-    ParseKeyPermissions(#[source] ParseIntError),
-}
-
-#[derive(Debug, Diagnostic, Error)]
-pub enum KeyAgentError {
-    #[diagnostic(code(wire::KeyAgent::SpawningAgent), help("Please create an issue!"))]
-    #[error("Error spawning key agent")]
-    SpawningAgent(#[source] std::io::Error),
-
-    #[diagnostic(code(wire::KeyAgent::Resolving), help("Please create an issue!"))]
-    #[error("Error resolving key agent child process")]
-    ResolvingError(#[source] std::io::Error),
-
-    #[diagnostic(
-        code(wire::KeyAgent::Fail),
-        help("If you suspect the reason is wire's fault, please create an issue!")
-    )]
-    #[error("failed to push keys (last 20 lines):\n{lines}", lines = format_error_lines(.1))]
-    AgentFailed(Name, Vec<String>),
-}
+use crate::{HiveLibError, create_ssh_command};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 #[serde(tag = "t", content = "c")]
