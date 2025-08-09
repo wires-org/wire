@@ -55,6 +55,16 @@
           '';
           meta.mainProgram = "wire";
         };
+
+        wire-dignostics-md = self'.packages.wire-unwrapped.overrideAttrs {
+          DIAGNOSTICS_MD_OUTPUT = "./diagnostics";
+          preBuild = ''
+            mkdir -p ./diagnostics
+          '';
+          installPhase = ''
+            mv ./diagnostics/DIAGNOSTICS.md $out
+          '';
+        };
       };
     };
 }
