@@ -2,7 +2,7 @@ use miette::{Context, IntoDiagnostic as _, Result, miette};
 use std::{
     env,
     fmt::{self, Display, Formatter},
-    fs::{self, Metadata},
+    fs::{self},
     path::Path,
 };
 
