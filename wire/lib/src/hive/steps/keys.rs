@@ -5,39 +5,21 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::Display;
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::pin::Pin;
-use std::process::{ExitStatus, Stdio};
+use std::process::Stdio;
 use std::str::from_utf8;
-use std::{num::ParseIntError, path::PathBuf};
-use thiserror::Error;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::{fs::File, io::AsyncRead};
 use tracing::{debug, info, trace, warn};
 
+use crate::errors::{KeyAgentError, KeyError};
 use crate::hive::node::{
     Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
 };
 use crate::hive::steps::activate::get_elevation;
 use crate::{HiveLibError, create_ssh_command};
-
-#[derive(Debug, Error)]
-pub enum KeyError {
-    #[error("error reading file")]
-    File(#[source] std::io::Error),
-
-    #[error("error spawning command")]
-    CommandSpawnError(#[source] std::io::Error),
-
-    #[error("key command failed with status {}: {}", .0,.1)]
-    CommandError(ExitStatus, String),
-
-    #[error("Command list empty")]
-    Empty,
-
-    #[error("Failed to parse key permissions")]
-    ParseKeyPermissions(#[source] ParseIntError),
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 #[serde(tag = "t", content = "c")]
@@ -105,10 +87,17 @@ async fn create_reader(
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
-                .map_err(KeyError::CommandSpawnError)?
+                .map_err(|err| KeyError::CommandSpawnError {
+                    error: err,
+                    command: args.join(" "),
+                    command_span: Some((0..args.first().unwrap().len()).into()),
+                })?
                 .wait_with_output()
                 .await
-                .map_err(KeyError::CommandSpawnError)?;
+                .map_err(|err| KeyError::CommandResolveError {
+                    error: err,
+                    command: args.join(" "),
+                })?;
 
             if output.status.success() {
                 return Ok(Box::pin(Cursor::new(output.stdout)));
@@ -214,13 +203,16 @@ impl ExecuteStep for KeysStep {
                 self.filter == UploadKeyAt::NoFilter
                     || (self.filter != UploadKeyAt::NoFilter && key.upload_at != self.filter)
             })
-            .map(|key| async move { process_key(key).await });
+            .map(|key| async move {
+                process_key(key)
+                    .await
+                    .map_err(|err| HiveLibError::KeyError(key.name.clone(), err))
+            });
 
         let (keys, bufs): (Vec<key_agent::keys::Key>, Vec<Vec<u8>>) = join_all(futures)
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, KeyError>>()
-            .map_err(HiveLibError::KeyError)?
+            .collect::<Result<Vec<_>, HiveLibError>>()?
             .into_iter()
             .unzip();
 
@@ -233,7 +225,7 @@ impl ExecuteStep for KeysStep {
         let mut command =
             if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
                 warn!("Placing keys locally for node {0}", ctx.name);
-                get_elevation("wire key agent")?;
+                get_elevation("wire key agent").map_err(HiveLibError::ActivationError)?;
                 Command::new("sudo")
             } else {
                 create_ssh_command(&ctx.node.target, true)?
@@ -248,7 +240,7 @@ impl ExecuteStep for KeysStep {
             .stderr(Stdio::piped())
             .stdin(Stdio::piped())
             .spawn()
-            .map_err(HiveLibError::SpawnFailed)?;
+            .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::SpawningAgent(err)))?;
 
         // take() stdin so it will be dropped out of block
         if let Some(mut stdin) = child.stdin.take() {
@@ -260,7 +252,7 @@ impl ExecuteStep for KeysStep {
         let output = child
             .wait_with_output()
             .await
-            .map_err(HiveLibError::SpawnFailed)?;
+            .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::ResolvingError(err)))?;
 
         if output.status.success() {
             info!("Successfully pushed keys to {}", ctx.name);
@@ -271,13 +263,13 @@ impl ExecuteStep for KeysStep {
 
         let stderr = String::from_utf8_lossy(&output.stderr);
 
-        Err(HiveLibError::KeyCommandError(
+        Err(HiveLibError::KeyAgentError(KeyAgentError::AgentFailed(
             ctx.name.clone(),
             stderr
                 .split('\n')
                 .map(std::string::ToString::to_string)
                 .collect(),
-        ))
+        )))
     }
 }
 

@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, trace};
 
+use crate::errors::{HiveInitializationError, NixChildError};
 use crate::nix::{EvalGoal, get_eval_command};
 use crate::{HiveLibError, SubCommandModifiers};
 pub mod node;
@@ -49,7 +50,7 @@ impl Hive {
         let command = get_eval_command(path, &EvalGoal::Inspect, modifiers)?
             .output()
             .await
-            .map_err(HiveLibError::NixExecError)?;
+            .map_err(|err| HiveLibError::NixChildError(NixChildError::ResolveError(err)))?;
 
         let stdout = String::from_utf8_lossy(&command.stdout);
         let stderr = String::from_utf8_lossy(&command.stderr);
@@ -57,17 +58,22 @@ impl Hive {
         debug!("Output of nix eval: {stdout}");
 
         if command.status.success() {
-            let hive: Hive =
-                serde_json::from_str(&stdout).map_err(HiveLibError::ParseEvaluateError)?;
+            let hive: Hive = serde_json::from_str(&stdout).map_err(|err| {
+                HiveLibError::HiveInitializationError(HiveInitializationError::ParseEvaluateError(
+                    err,
+                ))
+            })?;
 
             return Ok(hive);
         }
 
-        Err(HiveLibError::NixEvalError(
-            stderr
-                .split('\n')
-                .map(std::string::ToString::to_string)
-                .collect(),
+        Err(HiveLibError::HiveInitializationError(
+            HiveInitializationError::NixEvalError(
+                stderr
+                    .split('\n')
+                    .map(std::string::ToString::to_string)
+                    .collect(),
+            ),
         ))
     }
 
@@ -80,7 +86,9 @@ impl Hive {
 
             self.nodes
                 .get_mut(&Name(Arc::from(node.clone())))
-                .ok_or(HiveLibError::NodeDoesNotExist(node.to_string()))?
+                .ok_or(HiveLibError::HiveInitializationError(
+                    HiveInitializationError::NodeDoesNotExist(node.to_string()),
+                ))?
                 .build_remotely = false;
         }
 
@@ -234,7 +242,9 @@ mod tests {
 
         assert!(matches!(
             Hive::new_from_path(&path, SubCommandModifiers::default()).await,
-            Err(HiveLibError::NixEvalError(..))
+            Err(HiveLibError::HiveInitializationError(
+                HiveInitializationError::NixEvalError(..)
+            ))
         ));
     }
 
@@ -244,7 +254,9 @@ mod tests {
 
         assert!(matches!(
             Hive::new_from_path(&path, SubCommandModifiers::default()).await,
-            Err(HiveLibError::NixEvalError(..))
+            Err(HiveLibError::HiveInitializationError(
+                HiveInitializationError::NixEvalError(..)
+            ))
         ));
     }
 }

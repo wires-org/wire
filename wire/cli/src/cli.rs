@@ -91,6 +91,10 @@ pub struct ApplyArgs {
     /// Overrides deployment.buildOnTarget.
     #[arg(short, long, value_name = "NODE")]
     pub always_build_local: Vec<String>,
+
+    /// Reboot the nodes after activation
+    #[arg(short, long, default_value_t = false)]
+    pub reboot: bool,
 }
 
 #[derive(Subcommand)]
@@ -137,7 +141,7 @@ pub enum Goal {
 }
 
 impl TryFrom<Goal> for HiveGoal {
-    type Error = anyhow::Error;
+    type Error = miette::Error;
 
     fn try_from(value: Goal) -> Result<Self, Self::Error> {
         match value {

@@ -1,17 +1,30 @@
-use anyhow::anyhow;
 use futures::{FutureExt, StreamExt};
 use indicatif::ProgressStyle;
 use itertools::{Either, Itertools};
-use lib::SubCommandModifiers;
 use lib::hive::Hive;
-use lib::hive::node::{Context, GoalExecutor, StepState};
+use lib::hive::node::{Context, GoalExecutor, Name, StepState};
+use lib::{SubCommandModifiers, errors::HiveLibError};
+use miette::{Diagnostic, Result};
 use std::collections::HashSet;
-use std::fmt::Write;
 use std::path::PathBuf;
+use thiserror::Error;
 use tracing::{Span, error, info, instrument};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 use crate::cli::{ApplyArgs, ApplyTarget};
+
+#[derive(Debug, Error, Diagnostic)]
+#[error("node {} failed to apply", .0)]
+struct NodeError(
+    Name,
+    #[source]
+    #[diagnostic_source]
+    HiveLibError,
+);
+
+#[derive(Debug, Error, Diagnostic)]
+#[error("{} node(s) failed to apply.", .0.len())]
+struct NodeErrors(#[related] Vec<NodeError>);
 
 #[instrument(skip_all, fields(goal = %args.goal, on = %args.on.iter().join(", ")))]
 pub async fn apply(
@@ -19,7 +32,7 @@ pub async fn apply(
     args: ApplyArgs,
     path: PathBuf,
     modifiers: SubCommandModifiers,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     let header_span = Span::current();
     header_span.pb_set_style(&ProgressStyle::default_bar());
     header_span.pb_set_length(1);
@@ -62,6 +75,7 @@ pub async fn apply(
                 no_keys: args.no_keys,
                 hivepath: path,
                 modifiers,
+                reboot: args.reboot,
             };
 
             GoalExecutor::new(context)
@@ -96,16 +110,13 @@ pub async fn apply(
     std::mem::drop(header_span);
 
     if !errors.is_empty() {
-        return Err(anyhow!(
-            "{} node(s) failed to apply. {}",
-            errors.len(),
+        return Err(NodeErrors(
             errors
-                .iter()
-                .fold(String::new(), |mut output, (name, error)| {
-                    let _ = write!(output, "\n\n{name}: {error}");
-                    output
-                })
-        ));
+                .into_iter()
+                .map(|(name, error)| NodeError(name.clone(), error))
+                .collect(),
+        )
+        .into());
     }
 
     Ok(())

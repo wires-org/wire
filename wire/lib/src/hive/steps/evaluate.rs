@@ -48,6 +48,6 @@ impl ExecuteStep for Step {
             return Ok(());
         }
 
-        Err(HiveLibError::NixEvalInteralError(ctx.name.clone(), stderr))
+        Err(HiveLibError::NixEvalInternalError(ctx.name.clone(), stderr))
     }
 }

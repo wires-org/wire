@@ -7,6 +7,7 @@ use tokio::io::{AsyncBufReadExt, AsyncRead};
 use tracing::{Instrument, Span, error, info, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
+use crate::errors::{HiveInitializationError, NixChildError};
 use crate::hive::find_hive;
 use crate::hive::node::Name;
 use crate::nix_log::{Action, Internal, NixLog, Trace};
@@ -47,8 +48,10 @@ pub fn get_eval_command(
 ) -> Result<tokio::process::Command, HiveLibError> {
     assert!(check_nix_available(), "nix is not available on this system");
 
-    let canon_path = find_hive(&path.canonicalize().unwrap())
-        .ok_or(HiveLibError::NoHiveFound(path.to_path_buf()))?;
+    let canon_path =
+        find_hive(&path.canonicalize().unwrap()).ok_or(HiveLibError::HiveInitializationError(
+            HiveInitializationError::NoHiveFound(path.to_path_buf()),
+        ))?;
 
     let mut command = tokio::process::Command::new("nix");
     command.args(["--extra-experimental-features", "nix-command"]);
@@ -92,7 +95,7 @@ where
     while let Some(line) = io_reader
         .next_line()
         .await
-        .map_err(HiveLibError::SpawnFailed)?
+        .map_err(|err| HiveLibError::NixChildError(NixChildError::SpawnFailed(err)))?
     {
         let log = serde_json::from_str::<Internal>(line.strip_prefix("@nix ").unwrap_or(&line))
             .map(NixLog::Internal)
@@ -142,19 +145,29 @@ impl StreamTracing for tokio::process::Command {
             .stderr(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .spawn()
-            .map_err(HiveLibError::SpawnFailed)?;
+            .map_err(|err| HiveLibError::NixChildError(NixChildError::SpawnFailed(err)))?;
 
-        let stdout_handle = child.stdout.take().ok_or(HiveLibError::NoHandle)?;
-        let stderr_handle = child.stderr.take().ok_or(HiveLibError::NoHandle)?;
+        let stdout_handle = child
+            .stdout
+            .take()
+            .ok_or(HiveLibError::NixChildError(NixChildError::NoHandle))?;
+        let stderr_handle = child
+            .stderr
+            .take()
+            .ok_or(HiveLibError::NixChildError(NixChildError::NoHandle))?;
 
         let stderr_task = tokio::spawn(handle_io(stderr_handle, log_stderr).in_current_span());
         let stdout_task = tokio::spawn(handle_io(stdout_handle, false));
 
-        let handle =
-            tokio::spawn(async move { child.wait().await.map_err(HiveLibError::SpawnFailed) });
+        let handle = tokio::spawn(async move {
+            child
+                .wait()
+                .await
+                .map_err(|err| HiveLibError::NixChildError(NixChildError::SpawnFailed(err)))
+        });
 
-        let (result, stdout, stderr) =
-            tokio::try_join!(handle, stdout_task, stderr_task).map_err(HiveLibError::JoinError)?;
+        let (result, stdout, stderr) = tokio::try_join!(handle, stdout_task, stderr_task)
+            .map_err(|err| HiveLibError::NixChildError(NixChildError::JoinError(err)))?;
 
         Ok((result?, stdout?, stderr?))
     }

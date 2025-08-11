@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - yyyy-mm-dd
 
+### Added
+
+- Added `--reboot`. Wire will wait for the node to reconnect after rebooting.
+  Wire will refuse to reboot localhost. Keys post-activation will be applied
+  after rebooting!
+- Most errors now have error codes and documentation links.
+
 ### Changed
 
 - `wire inspect/show --json` will no longer use a pretty print.
+- Wire will now wait for the node to reconnect if activation failed (excluding
+  dry-activate).
+- Error messages have been greatly improved.
 
 ## [0.4.0] - 2025-07-10
 

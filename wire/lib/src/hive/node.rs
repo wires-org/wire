@@ -10,6 +10,7 @@ use tracing::{Instrument, Span, error, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 use crate::SubCommandModifiers;
+use crate::errors::NetworkError;
 use crate::hive::steps::keys::{Key, KeysStep, PushKeyAgentStep, UploadKeyAt};
 use crate::hive::steps::ping::PingStep;
 use crate::nix::StreamTracing;
@@ -46,7 +47,7 @@ impl Target {
     pub fn get_preffered_host(&self) -> Result<&Arc<str>, HiveLibError> {
         self.hosts
             .get(self.current_host)
-            .ok_or(HiveLibError::HostsExhausted)
+            .ok_or(HiveLibError::NetworkError(NetworkError::HostsExhausted))
     }
 
     pub fn host_failed(&mut self) {
@@ -97,13 +98,41 @@ impl Default for Node {
     }
 }
 
-#[cfg(test)]
 impl Node {
+    #[cfg(test)]
     pub fn from_host(host: &str) -> Self {
         Node {
             target: Target::from_host(host),
             ..Default::default()
         }
+    }
+
+    pub async fn ping(&self) -> Result<(), HiveLibError> {
+        let mut command = Command::new("nix");
+
+        command
+            .args(["--extra-experimental-features", "nix-command"])
+            .arg("store")
+            .arg("ping")
+            .arg("--store")
+            .arg(format!(
+                "ssh://{}@{}",
+                self.target.user,
+                self.target.get_preffered_host()?
+            ))
+            .env("NIX_SSHOPTS", format!("-p {}", self.target.port));
+
+        let (status, _stdout, _) = crate::nix::StreamTracing::execute(&mut command, true)
+            .in_current_span()
+            .await?;
+
+        if status.success() {
+            return Ok(());
+        }
+
+        Err(HiveLibError::NetworkError(NetworkError::HostUnreachable(
+            self.target.get_preffered_host()?.to_string(),
+        )))
     }
 }
 
@@ -164,6 +193,7 @@ pub struct Context<'a> {
     pub no_keys: bool,
     pub state: StepState,
     pub goal: Goal,
+    pub reboot: bool,
 }
 
 pub struct GoalExecutor<'a> {
@@ -244,7 +274,11 @@ pub async fn push(node: &Node, name: &Name, push: Push<'_>) -> Result<(), HiveLi
     let (status, _stdout, stderr_vec) = command.execute(true).in_current_span().await?;
 
     if !status.success() {
-        return Err(HiveLibError::NixCopyError(name.clone(), stderr_vec));
+        return Err(HiveLibError::NixCopyError {
+            name: name.clone(),
+            logs: stderr_vec,
+            path: push.to_string(),
+        });
     }
 
     Ok(())
