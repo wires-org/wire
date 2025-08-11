@@ -125,7 +125,8 @@ impl DerviedError {
 
         if let Expr::Lit(lit) = list.value {
             if let Lit::Str(str) = lit.lit {
-                self.doc_string.push_str(&format!("{}\n\n", str.value()));
+                self.doc_string
+                    .push_str(&format!("{}\n\n", &str.value()[1..]));
             }
         }
 
