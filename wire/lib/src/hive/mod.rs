@@ -242,7 +242,9 @@ mod tests {
 
         assert!(matches!(
             Hive::new_from_path(&path, SubCommandModifiers::default()).await,
-            Err(HiveLibError::NixEvalError(..))
+            Err(HiveLibError::HiveInitializationError(
+                HiveInitializationError::NixEvalError(..)
+            ))
         ));
     }
 
@@ -252,7 +254,9 @@ mod tests {
 
         assert!(matches!(
             Hive::new_from_path(&path, SubCommandModifiers::default()).await,
-            Err(HiveLibError::NixEvalError(..))
+            Err(HiveLibError::HiveInitializationError(
+                HiveInitializationError::NixEvalError(..)
+            ))
         ));
     }
 }
