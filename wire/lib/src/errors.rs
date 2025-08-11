@@ -16,8 +16,6 @@ const DOCS_URL: &str = "https://wire.althaea.zone/reference/errors.html";
 
 #[derive(Debug, Diagnostic, Error)]
 pub enum KeyError {
-    /// Doc string one
-    /// Doc String two
     #[diagnostic(
         code(wire::Key::File),
         url("{DOCS_URL}#{}", self.code().unwrap())
