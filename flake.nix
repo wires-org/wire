@@ -44,6 +44,7 @@
       flake = {
         nixosModules.default = import ./runtime/module.nix;
         makeHive = import ./runtime/makeHive.nix;
+        hydraJobs = { inherit (self.packages) x86_64-linux; };
       };
 
       perSystem =
