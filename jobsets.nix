@@ -62,7 +62,7 @@ in
   jobsets = mkSpec ({
     test-hydra = mkJobset {
       description = "${repo.name}'s main branch";
-      flake = "git+ssh://git@github.com/${repo.owner}/${repo.name}?ref=test";
+      flake = "git+ssh://git@github.com/${repo.owner}/${repo.name}?ref=test-hydra";
     };
 
     hydra-other-branch = mkJobset {
