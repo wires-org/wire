@@ -64,6 +64,11 @@ in
       description = "${repo.name}'s main branch";
       flake = "github:${repo.owner}/${repo.name}/test-hydra";
     };
+
+    hydra-other-branch = mkJobset {
+      description = "other branch";
+      flake = "github:${repo.owner}/${repo.name}/hydra-other-branch";
+    };
   }
   # // (mapAttrs' (n: pr: {
   #   name = "pr_${n}";
