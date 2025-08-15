@@ -34,6 +34,9 @@ async fn main() -> Result<(), anyhow::Error> {
     // random change
     // another
     // a third
+    //
+
+    print!("real functionality");
 
     let args = Cli::parse();
 
