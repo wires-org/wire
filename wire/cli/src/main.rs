@@ -38,6 +38,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     print!("realest functionality");
 
+    print!("another change");
+
     let args = Cli::parse();
 
     let modifiers = args.to_subcommand_modifiers();
