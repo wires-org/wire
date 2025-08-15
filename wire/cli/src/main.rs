@@ -36,7 +36,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // a third
     //
 
-    print!("real functionality");
+    print!("realest functionality");
 
     let args = Cli::parse();
 
