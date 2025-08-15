@@ -1,7 +1,6 @@
 # referenced from https://github.com/aciceri/nixfleet/blob/master/modules/hydra/jobsets.nix
 # thank you!
 {
-  prs,
   ...
 }:
 let
@@ -22,7 +21,7 @@ let
       schedulingshares ? 100,
       enableemail ? false,
       emailoverride ? "",
-      keepnr ? 1,
+      keepnr ? 5,
       flake,
     }:
     {

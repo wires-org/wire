@@ -8,7 +8,7 @@
   "schedulingshares": 1,
   "enableemail": false,
   "emailoverride": "",
-  "keepnr": 1,
+  "keepnr": 5,
   "inputs": {
     "src": {
       "type": "git",
