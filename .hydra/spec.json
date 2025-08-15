@@ -1,0 +1,25 @@
+{
+  "enabled": 1,
+  "hidden": false,
+  "description": "wire tool",
+  "nixexprinput": "src",
+  "nixexprpath": "jobsets.nix",
+  "checkinterval": 300,
+  "schedulingshares": 1,
+  "enableemail": false,
+  "enable_dynamic_run_command": false,
+  "emailoverride": "",
+  "keepnr": 1,
+  "inputs": {
+    "src": {
+      "type": "path",
+      "value": "https://raw.githubusercontent.com/wires-org/wire/refs/heads/test-hydra/.hydra/jobsets.nix",
+      "emailresponsible": false
+    },
+    "prs": {
+      "type": "githubpulls",
+      "value": "wires-org wire",
+      "emailresponsible": false
+    }
+  }
+}
