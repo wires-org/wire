@@ -32,6 +32,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let _profiler = dhat::Profiler::new_heap();
 
     // random change
+    // another
 
     let args = Cli::parse();
 
