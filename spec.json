@@ -7,13 +7,12 @@
   "checkinterval": 300,
   "schedulingshares": 1,
   "enableemail": false,
-  "enable_dynamic_run_command": false,
   "emailoverride": "",
   "keepnr": 1,
   "inputs": {
     "src": {
-      "type": "path",
-      "value": "https://raw.githubusercontent.com/wires-org/wire/refs/heads/test-hydra/.hydra/jobsets.nix",
+      "type": "git",
+      "value": "https://github.com/wires-org/wire.git test-hydra",
       "emailresponsible": false
     },
     "prs": {

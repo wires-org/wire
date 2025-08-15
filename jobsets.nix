@@ -11,8 +11,6 @@ let
   };
 
   # nixpkgs
-  mapAttrsToList = f: attrs: builtins.attrValues (builtins.mapAttrs f attrs);
-  mapAttrs' = f: set: builtins.listToAttrs (mapAttrsToList f set);
 
   mkJobset =
     {
@@ -60,23 +58,20 @@ let
         '')
       ];
     };
-
-  pull_requests = builtins.fromJSON (builtins.readFile prs);
 in
 {
-  jobsets = mkSpec (
-    {
-      main = mkJobset {
-        description = "${repo.name}'s main branch";
-        flake = "github:${repo.owner}/${repo.name}/main";
-      };
-    }
-    // (mapAttrs' (n: pr: {
-      name = "pr_${n}";
-      value = mkJobset {
-        description = pr.title;
-        flake = "github:${repo.owner}/${repo.name}/${pr.head.ref}";
-      };
-    }) pull_requests)
+  jobsets = mkSpec ({
+    test-hydra = mkJobset {
+      description = "${repo.name}'s main branch";
+      flake = "github:${repo.owner}/${repo.name}/test-hydra";
+    };
+  }
+  # // (mapAttrs' (n: pr: {
+  #   name = "pr_${n}";
+  #   value = mkJobset {
+  #     description = pr.title;
+  #     flake = "github:${repo.owner}/${repo.name}/${pr.head.ref}";
+  #   };
+  # }) pull_requests)
   );
 }
