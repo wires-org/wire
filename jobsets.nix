@@ -62,19 +62,19 @@ in
   jobsets = mkSpec ({
     test-hydra = mkJobset {
       description = "${repo.name}'s main branch";
-      flake = "github:${repo.owner}/${repo.name}/test-hydra";
+      flake = "git+ssh://git@github.com/${repo.owner}/${repo.name}?ref=test";
     };
 
     hydra-other-branch = mkJobset {
       description = "other branch";
-      flake = "github:${repo.owner}/${repo.name}/hydra-other-branch";
+      flake = "git+ssh://git@github.com/${repo.owner}/${repo.name}?ref=hydra-other-branch";
     };
   }
   # // (mapAttrs' (n: pr: {
   #   name = "pr_${n}";
   #   value = mkJobset {
   #     description = pr.title;
-  #     flake = "github:${repo.owner}/${repo.name}/${pr.head.ref}";
+  #     flake = "git+ssh://git@github.com/${repo.owner}/${repo.name}?ref=${pr.head.ref}";
   #   };
   # }) pull_requests)
   );
