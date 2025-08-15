@@ -33,6 +33,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // random change
     // another
+    // a third
 
     let args = Cli::parse();
 
