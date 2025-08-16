@@ -40,6 +40,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     print!("another change");
 
+    print!("i can go print for print");
+
     let args = Cli::parse();
 
     let modifiers = args.to_subcommand_modifiers();
