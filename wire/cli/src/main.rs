@@ -34,6 +34,8 @@ async fn main() -> Result<()> {
 
     let args = Cli::parse();
 
+    println!("Random Change");
+
     let modifiers = args.to_subcommand_modifiers();
     setup_logging(args.no_progress, &args.verbose);
 
