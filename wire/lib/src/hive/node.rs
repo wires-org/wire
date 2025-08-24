@@ -206,7 +206,7 @@ impl<'a> GoalExecutor<'a> {
         Self {
             steps: vec![
                 Box::new(PingStep),
-                Box::new(PushKeyAgentStep),
+                // Box::new(PushKeyAgentStep),
                 Box::new(KeysStep {
                     filter: UploadKeyAt::NoFilter,
                 }),

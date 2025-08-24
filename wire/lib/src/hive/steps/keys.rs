@@ -13,7 +13,9 @@ use tokio::io::{AsyncReadExt as _, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::{fs::File, io::AsyncRead};
 use tracing::{debug, info, trace, warn};
+use tracing_indicatif::suspend_tracing_indicatif;
 
+use crate::detached_sudo::DetachedCommand;
 use crate::errors::{KeyAgentError, KeyError};
 use crate::hive::node::{
     Context, ExecuteStep, Goal, Push, SwitchToConfigurationGoal, push, should_apply_locally,
@@ -193,83 +195,95 @@ impl ExecuteStep for KeysStep {
     }
 
     async fn execute(&self, ctx: &mut Context<'_>) -> Result<(), HiveLibError> {
-        let agent_directory = ctx.state.key_agent_directory.as_ref().unwrap();
+        let command = DetachedCommand::spawn_new(&ctx.node.target).await?;
 
-        let futures = ctx
-            .node
-            .keys
-            .iter()
-            .filter(|key| {
-                self.filter == UploadKeyAt::NoFilter
-                    || (self.filter != UploadKeyAt::NoFilter && key.upload_at != self.filter)
-            })
-            .map(|key| async move {
-                process_key(key)
-                    .await
-                    .map_err(|err| HiveLibError::KeyError(key.name.clone(), err))
-            });
+        let child = suspend_tracing_indicatif(|| command.run_sudo_command("whoami"))?;
 
-        let (keys, bufs): (Vec<key_agent::keys::Key>, Vec<Vec<u8>>) = join_all(futures)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, HiveLibError>>()?
-            .into_iter()
-            .unzip();
+        info!("finished suspend");
+        info!("now waiting on fifo");
 
-        let msg = key_agent::keys::Keys { keys };
+        command.wait_until_complete(child).await?;
 
-        trace!("Sending message {msg:?}");
+        panic!("An expected panic");
 
-        let buf = msg.encode_to_vec();
-
-        let mut command =
-            if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
-                warn!("Placing keys locally for node {0}", ctx.name);
-                get_elevation("wire key agent").map_err(HiveLibError::ActivationError)?;
-                Command::new("sudo")
-            } else {
-                create_ssh_command(&ctx.node.target, true)?
-            };
-
-        let mut child = command
-            .args([
-                format!("{agent_directory}/bin/key_agent"),
-                buf.len().to_string(),
-            ])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdin(Stdio::piped())
-            .spawn()
-            .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::SpawningAgent(err)))?;
-
-        // take() stdin so it will be dropped out of block
-        if let Some(mut stdin) = child.stdin.take() {
-            trace!("Pushing msg");
-            copy_buffer(&mut stdin, &buf).await?;
-            copy_buffers(&mut stdin, bufs).await?;
-        }
-
-        let output = child
-            .wait_with_output()
-            .await
-            .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::ResolvingError(err)))?;
-
-        if output.status.success() {
-            info!("Successfully pushed keys to {}", ctx.name);
-            trace!("Agent stdout: {}", String::from_utf8_lossy(&output.stdout));
-
-            return Ok(());
-        }
-
-        let stderr = String::from_utf8_lossy(&output.stderr);
-
-        Err(HiveLibError::KeyAgentError(KeyAgentError::AgentFailed(
-            ctx.name.clone(),
-            stderr
-                .split('\n')
-                .map(std::string::ToString::to_string)
-                .collect(),
-        )))
+        Ok(())
+        // let agent_directory = ctx.state.key_agent_directory.as_ref().unwrap();
+        //
+        // let futures = ctx
+        //     .node
+        //     .keys
+        //     .iter()
+        //     .filter(|key| {
+        //         self.filter == UploadKeyAt::NoFilter
+        //             || (self.filter != UploadKeyAt::NoFilter && key.upload_at != self.filter)
+        //     })
+        //     .map(|key| async move {
+        //         process_key(key)
+        //             .await
+        //             .map_err(|err| HiveLibError::KeyError(key.name.clone(), err))
+        //     });
+        //
+        // let (keys, bufs): (Vec<key_agent::keys::Key>, Vec<Vec<u8>>) = join_all(futures)
+        //     .await
+        //     .into_iter()
+        //     .collect::<Result<Vec<_>, HiveLibError>>()?
+        //     .into_iter()
+        //     .unzip();
+        //
+        // let msg = key_agent::keys::Keys { keys };
+        //
+        // trace!("Sending message {msg:?}");
+        //
+        // let buf = msg.encode_to_vec();
+        //
+        // let mut command =
+        //     if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
+        //         warn!("Placing keys locally for node {0}", ctx.name);
+        //         get_elevation("wire key agent").map_err(HiveLibError::ActivationError)?;
+        //         Command::new("sudo")
+        //     } else {
+        //         create_ssh_command(&ctx.node.target, true)?
+        //     };
+        //
+        // let mut child = command
+        //     .args([
+        //         format!("{agent_directory}/bin/key_agent"),
+        //         buf.len().to_string(),
+        //     ])
+        //     .stdout(Stdio::piped())
+        //     .stderr(Stdio::piped())
+        //     .stdin(Stdio::piped())
+        //     .spawn()
+        //     .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::SpawningAgent(err)))?;
+        //
+        // // take() stdin so it will be dropped out of block
+        // if let Some(mut stdin) = child.stdin.take() {
+        //     trace!("Pushing msg");
+        //     copy_buffer(&mut stdin, &buf).await?;
+        //     copy_buffers(&mut stdin, bufs).await?;
+        // }
+        //
+        // let output = child
+        //     .wait_with_output()
+        //     .await
+        //     .map_err(|err| HiveLibError::KeyAgentError(KeyAgentError::ResolvingError(err)))?;
+        //
+        // if output.status.success() {
+        //     info!("Successfully pushed keys to {}", ctx.name);
+        //     trace!("Agent stdout: {}", String::from_utf8_lossy(&output.stdout));
+        //
+        //     return Ok(());
+        // }
+        //
+        // let stderr = String::from_utf8_lossy(&output.stderr);
+        //
+        // Err(HiveLibError::KeyAgentError(KeyAgentError::AgentFailed(
+        //     ctx.name.clone(),
+        //     stderr
+        //         .split('\n')
+        //         .map(std::string::ToString::to_string)
+        //         .collect(),
+        // )))
     }
 }
 

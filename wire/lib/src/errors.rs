@@ -2,6 +2,7 @@ use std::{num::ParseIntError, path::PathBuf, process::ExitStatus};
 
 use miette::{Diagnostic, SourceSpan};
 use thiserror::Error;
+use tokio::task::JoinError;
 
 use crate::{
     format_error_lines,
@@ -227,6 +228,57 @@ pub enum NixChildError {
 }
 
 #[derive(Debug, Diagnostic, Error)]
+pub enum DetachedError {
+    #[diagnostic(
+        code(wire::Detached::SpawningReader),
+        url("{DOCS_URL}#{}", self.code().unwrap())
+
+    )]
+    #[error("Failed to spawn a detatched reader")]
+    JoinError(#[source] std::io::Error),
+
+    #[diagnostic(
+        code(wire::Detached::SpawnMkFifo),
+        help("please create an issue!"),
+        url("{DOCS_URL}#{}", self.code().unwrap())
+    )]
+    #[error("Could not spawn mkfifo on node")]
+    SpawnMkFifo(#[source] std::io::Error),
+
+    #[diagnostic(
+        code(wire::Detached::MkFifo),
+        help("please create an issue!"),
+        url("{DOCS_URL}#{}", self.code().unwrap())
+    )]
+    #[error("mkfifo on node failed.\nStdout: {}\nStderr: {}", .stdout, .stderr)]
+    FailToMkFifo { stdout: String, stderr: String },
+
+    #[diagnostic(
+        code(wire::Detatched::NoHandle),
+        help("This should never happen, please create an issue!"),
+        url("{DOCS_URL}#{}", self.code().unwrap())
+    )]
+    #[error("There was no handle to io")]
+    NoHandle,
+
+    #[diagnostic(
+        code(wire::Detached::FailSpawnSudo),
+        help("please create an issue!"),
+        url("{DOCS_URL}#{}", self.code().unwrap())
+    )]
+    #[error("Failed to spawn sudo on node")]
+    FailSpawnSudo(#[source] std::io::Error),
+
+    #[diagnostic(
+        code(wire::Detached::JoiningFifos),
+        help("please create an issue!"),
+        url("{DOCS_URL}#{}", self.code().unwrap())
+    )]
+    #[error("Failed to join reader threads")]
+    JoiningFifos(#[source] JoinError),
+}
+
+#[derive(Debug, Diagnostic, Error)]
 pub enum HiveLibError {
     #[error(transparent)]
     #[diagnostic(transparent)]
@@ -239,6 +291,17 @@ pub enum HiveLibError {
     #[error(transparent)]
     #[diagnostic(transparent)]
     ActivationError(ActivationError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    DetachedError(DetachedError),
+
+    #[diagnostic()]
+    #[error("Multiple errors occured in a detached command.")]
+    MultipleDetachedErrors {
+        #[related]
+        errors: Vec<DetachedError>,
+    },
 
     #[error("Failed to apply key {}", .0)]
     KeyError(

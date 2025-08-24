@@ -9,6 +9,7 @@ use tokio::process::Command;
 
 use crate::errors::HiveLibError;
 
+pub mod detached_sudo;
 pub mod hive;
 mod nix;
 mod nix_log;
