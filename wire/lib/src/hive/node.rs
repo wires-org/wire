@@ -2,18 +2,18 @@
 use async_trait::async_trait;
 use gethostname::gethostname;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::process::Command;
-use tracing::{Instrument, Span, error, info, instrument, trace};
-use tracing_indicatif::span_ext::IndicatifSpanExt;
+use std::sync::{Arc, Mutex};
+use tracing::{error, info, instrument, trace};
 
 use crate::SubCommandModifiers;
+use crate::commands::nonelevated::NonElevatedCommand;
+use crate::commands::{ChildOutputMode, WireCommand, WireCommandChip};
 use crate::errors::NetworkError;
 use crate::hive::steps::keys::{Key, KeysStep, PushKeyAgentStep, UploadKeyAt};
 use crate::hive::steps::ping::PingStep;
-use crate::nix::StreamTracing;
 
 use super::HiveLibError;
 use super::steps::activate::SwitchToConfigurationStep;
@@ -107,32 +107,31 @@ impl Node {
         }
     }
 
-    pub async fn ping(&self) -> Result<(), HiveLibError> {
-        let mut command = Command::new("nix");
+    pub async fn ping(&self, clobber_lock: Arc<Mutex<()>>) -> Result<(), HiveLibError> {
+        let host = self.target.get_preffered_host()?;
 
-        command
-            .args(["--extra-experimental-features", "nix-command"])
-            .arg("store")
-            .arg("ping")
-            .arg("--store")
-            .arg(format!(
-                "ssh://{}@{}",
-                self.target.user,
-                self.target.get_preffered_host()?
-            ))
-            .env("NIX_SSHOPTS", format!("-p {}", self.target.port));
+        let command_string = format!(
+            "nix --extra-experimental-features nix-command \
+            store ping --store ssh://{}@{}",
+            self.target.user, host
+        );
 
-        let (status, _stdout, _) = crate::nix::StreamTracing::execute(&mut command, true)
-            .in_current_span()
-            .await?;
+        let mut command = NonElevatedCommand::spawn_new(None, ChildOutputMode::Nix).await?;
+        let output = command.run_command_with_env(
+            command_string,
+            false,
+            HashMap::from([("NIX_SSHOPTS".into(), format!("-p {}", self.target.port))]),
+            clobber_lock,
+        )?;
 
-        if status.success() {
-            return Ok(());
-        }
+        output.wait_till_success().await.map_err(|source| {
+            HiveLibError::NetworkError(NetworkError::HostUnreachable {
+                host: host.to_string(),
+                source,
+            })
+        })?;
 
-        Err(HiveLibError::NetworkError(NetworkError::HostUnreachable(
-            self.target.get_preffered_host()?.to_string(),
-        )))
+        Ok(())
     }
 }
 
@@ -194,6 +193,7 @@ pub struct Context<'a> {
     pub state: StepState,
     pub goal: Goal,
     pub reboot: bool,
+    pub clobber_lock: Arc<Mutex<()>>,
 }
 
 pub struct GoalExecutor<'a> {
@@ -227,7 +227,7 @@ impl<'a> GoalExecutor<'a> {
     }
 
     #[instrument(skip_all, name = "goal", fields(node = %self.context.name))]
-    pub async fn execute(mut self, span: Span) -> Result<(), HiveLibError> {
+    pub async fn execute(mut self) -> Result<(), HiveLibError> {
         let steps = self
             .steps
             .iter()
@@ -235,59 +235,22 @@ impl<'a> GoalExecutor<'a> {
             .inspect(|step| trace!("Will execute step `{step}` for {}", self.context.name))
             .collect::<Vec<_>>();
 
-        span.pb_inc_length(steps.len().try_into().unwrap());
-
         for step in steps {
             info!("Executing step `{step}`");
 
             step.execute(&mut self.context).await.inspect_err(|_| {
                 error!("Failed to execute `{step}`");
             })?;
-
-            span.pb_inc(1);
         }
 
         Ok(())
     }
 }
 
-pub async fn push(node: &Node, name: &Name, push: Push<'_>) -> Result<(), HiveLibError> {
-    let mut command = Command::new("nix");
-
-    command
-        .args(["--extra-experimental-features", "nix-command"])
-        .arg("copy")
-        .arg("--substitute-on-destination")
-        .arg("--to")
-        .arg(format!(
-            "ssh://{}@{}",
-            node.target.user,
-            node.target.get_preffered_host()?
-        ))
-        .env("NIX_SSHOPTS", format!("-p {}", node.target.port));
-
-    match push {
-        Push::Derivation(drv) => command.args([drv.to_string(), "--derivation".to_string()]),
-        Push::Path(path) => command.arg(path),
-    };
-
-    let (status, _stdout, stderr_vec) = command.execute(true).in_current_span().await?;
-
-    if !status.success() {
-        return Err(HiveLibError::NixCopyError {
-            name: name.clone(),
-            logs: stderr_vec,
-            path: push.to_string(),
-        });
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{get_test_path, hive::Hive};
+    use crate::{get_test_path, hive::Hive, test_support::get_clobber_lock};
     use std::{collections::HashMap, env};
 
     #[tokio::test]
@@ -295,7 +258,7 @@ mod tests {
     async fn default_values_match() {
         let mut path = get_test_path!();
 
-        let hive = Hive::new_from_path(&path, SubCommandModifiers::default())
+        let hive = Hive::new_from_path(&path, SubCommandModifiers::default(), get_clobber_lock())
             .await
             .unwrap();
 

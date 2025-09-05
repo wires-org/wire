@@ -1,5 +1,4 @@
 use futures::{FutureExt, StreamExt};
-use indicatif::ProgressStyle;
 use itertools::{Either, Itertools};
 use lib::hive::Hive;
 use lib::hive::node::{Context, GoalExecutor, Name, StepState};
@@ -7,9 +6,9 @@ use lib::{SubCommandModifiers, errors::HiveLibError};
 use miette::{Diagnostic, Result};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tracing::{Span, error, info, instrument};
-use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 use crate::cli::{ApplyArgs, ApplyTarget};
 
@@ -32,10 +31,9 @@ pub async fn apply(
     args: ApplyArgs,
     path: PathBuf,
     modifiers: SubCommandModifiers,
+    clobber_lock: Arc<Mutex<()>>,
 ) -> Result<()> {
     let header_span = Span::current();
-    header_span.pb_set_style(&ProgressStyle::default_bar());
-    header_span.pb_set_length(1);
 
     // Respect user's --always-build-local arg
     hive.force_always_local(args.always_build_local)?;
@@ -63,7 +61,6 @@ pub async fn apply(
         })
         .map(|node| {
             let path = path.clone();
-            let span = header_span.clone();
 
             info!("Resolved {:?} to include {}", args.on, node.0);
 
@@ -76,10 +73,11 @@ pub async fn apply(
                 hivepath: path,
                 modifiers,
                 reboot: args.reboot,
+                clobber_lock: clobber_lock.clone(),
             };
 
             GoalExecutor::new(context)
-                .execute(span)
+                .execute()
                 .map(move |result| (node.0, result))
         })
         .peekable();

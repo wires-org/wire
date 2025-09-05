@@ -6,8 +6,8 @@ use clap_verbosity_flag::WarnLevel;
 use lib::SubCommandModifiers;
 use lib::hive::Hive;
 use lib::hive::node::{Goal as HiveGoal, Name, SwitchToConfigurationGoal};
-use std::io::IsTerminal;
 
+use std::io::IsTerminal;
 use std::{
     fmt::{self, Display, Formatter},
     sync::Arc,
@@ -31,6 +31,7 @@ pub struct Cli {
     #[arg(long, global = true, default_value = std::env::current_dir().unwrap().into_os_string())]
     pub path: std::path::PathBuf,
 
+    // Unused until a solution to tracing-indicatif log deadlocking is found...
     /// Hide progress bars. Defaults to true if stdin does not refer to a tty (unix pipelines, in CI).
     #[arg(long, global = true, default_value_t = !std::io::stdin().is_terminal())]
     pub no_progress: bool,
