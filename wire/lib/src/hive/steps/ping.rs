@@ -27,7 +27,7 @@ impl ExecuteStep for PingStep {
         loop {
             info!("Attempting host {}", ctx.node.target.get_preffered_host()?);
 
-            if ctx.node.ping().await.is_ok() {
+            if ctx.node.ping(ctx.clobber_lock.clone()).await.is_ok() {
                 return Ok(());
             }
 

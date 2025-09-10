@@ -1,13 +1,12 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use tokio::process::Command;
-use tracing::{Instrument, info, instrument};
+use tracing::{info, instrument};
 
 use crate::{
-    HiveLibError, create_ssh_command,
+    HiveLibError,
+    commands::{ChildOutputMode, WireCommand, WireCommandChip, nonelevated::NonElevatedCommand},
     hive::node::{Context, ExecuteStep, Goal},
-    nix::StreamTracing,
 };
 
 pub struct Step;
@@ -28,44 +27,33 @@ impl ExecuteStep for Step {
     async fn execute(&self, ctx: &mut Context<'_>) -> Result<(), HiveLibError> {
         let top_level = ctx.state.evaluation.as_ref().unwrap();
 
-        let mut command = if ctx.node.build_remotely {
-            let mut command = create_ssh_command(&ctx.node.target, false)?;
-            command.arg("nix");
-            command
-        } else {
-            Command::new("nix")
-        };
+        let command_string = format!(
+            "nix --extra-experimental-features nix-command \
+            build --print-build-logs --print-out-paths {top_level}"
+        );
 
-        command
-            .args(["--extra-experimental-features", "nix-command"])
-            .arg("build")
-            .arg("--print-build-logs")
-            .arg("--print-out-paths")
-            .arg(top_level.to_string());
+        let mut command = NonElevatedCommand::spawn_new(
+            if ctx.node.build_remotely {
+                Some(&ctx.node.target)
+            } else {
+                None
+            },
+            ChildOutputMode::Nix,
+        )
+        .await?;
 
-        let (status, stdout, stderr_vec) = command.execute(true).in_current_span().await?;
+        let (_, stdout) = command
+            .run_command(command_string, false, ctx.clobber_lock.clone())?
+            .wait_till_success()
+            .await
+            .map_err(|source| HiveLibError::NixBuildError {
+                name: ctx.name.clone(),
+                source,
+            })?;
 
-        if status.success() {
-            info!("Built output: {stdout:?}");
+        info!("Built output: {stdout:?}");
+        ctx.state.build = Some(stdout);
 
-            let stdout = stdout
-                .into_iter()
-                .map(|l| l.to_string())
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            ctx.state.build = Some(stdout);
-
-            return Ok(());
-        }
-
-        let stderr: Vec<String> = stderr_vec
-            .into_iter()
-            .map(|l| l.to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        Err(HiveLibError::NixBuildError(ctx.name.clone(), stderr))
+        Ok(())
     }
 }

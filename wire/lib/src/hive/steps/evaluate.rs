@@ -1,12 +1,12 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use tracing::{Instrument, instrument};
+use tracing::instrument;
 
 use crate::{
-    HiveLibError,
-    hive::node::{Context, Derivation, ExecuteStep, Goal},
-    nix::{EvalGoal, StreamTracing, get_eval_command},
+    EvalGoal, HiveLibError,
+    commands::common::evaluate_hive_attribute,
+    hive::node::{Context, ExecuteStep, Goal},
 };
 
 pub struct Step;
@@ -25,29 +25,16 @@ impl ExecuteStep for Step {
 
     #[instrument(skip_all, name = "eval")]
     async fn execute(&self, ctx: &mut Context<'_>) -> Result<(), HiveLibError> {
-        let command = get_eval_command(
+        let output = evaluate_hive_attribute(
             &ctx.hivepath,
             &EvalGoal::GetTopLevel(ctx.name),
             ctx.modifiers,
-        );
+            ctx.clobber_lock.clone(),
+        )
+        .await?;
 
-        let (status, stdout_vec, stderr) = command?.execute(true).in_current_span().await?;
+        ctx.state.evaluation = serde_json::from_str(&output).expect("failed to parse derivation");
 
-        if status.success() {
-            let stdout: Vec<String> = stdout_vec
-                .into_iter()
-                .map(|l| l.to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-
-            let derivation: Derivation =
-                serde_json::from_str(&stdout.join("\n")).expect("failed to parse derivation");
-
-            ctx.state.evaluation = Some(derivation);
-
-            return Ok(());
-        }
-
-        Err(HiveLibError::NixEvalInternalError(ctx.name.clone(), stderr))
+        Ok(())
     }
 }

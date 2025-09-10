@@ -3,6 +3,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt::{Debug, Display};
 use tracing::{Level as tracing_level, event, info};
 
+// static DIGEST_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[0-9a-z]{32}").unwrap());
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "action")]
 pub enum Action {
@@ -43,7 +45,20 @@ pub enum NixLog {
 
 pub(crate) trait Trace {
     fn trace(&self);
-    fn is_error(&self) -> bool;
+}
+
+impl Internal {
+    pub fn get_errorish_message(self) -> Option<String> {
+        if let Action::Message {
+            level: Level::Error | Level::Warn | Level::Notice,
+            message,
+        } = self.action
+        {
+            return message;
+        }
+
+        None
+    }
 }
 
 impl Trace for Internal {
@@ -69,24 +84,20 @@ impl Trace for Internal {
             Action::Stop => {}
         }
     }
-
-    fn is_error(&self) -> bool {
-        matches!(&self.action, Action::Message { level, message: _ } if matches!(level, Level::Error))
-    }
 }
 
 impl Trace for NixLog {
     fn trace(&self) {
         match self {
-            NixLog::Internal(line) => line.trace(),
-            NixLog::Raw(line) => info!("{line}"),
-        }
-    }
+            NixLog::Internal(line) => {
+                line.trace();
 
-    fn is_error(&self) -> bool {
-        match self {
-            NixLog::Internal(line) => line.is_error(),
-            NixLog::Raw(..) => false,
+                // tracing_indicatif::span_ext::IndicatifSpanExt::pb_set_message(
+                //     &Span::current(),
+                //     &DIGEST_RE.replace_all(&line.to_string(), "…"),
+                // );
+            }
+            NixLog::Raw(line) => info!("{line}"),
         }
     }
 }

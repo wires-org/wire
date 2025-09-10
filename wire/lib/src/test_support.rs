@@ -1,4 +1,9 @@
-use std::{fs, io, path::Path, process::Command};
+use std::{
+    fs, io,
+    path::Path,
+    process::Command,
+    sync::{Arc, Mutex},
+};
 
 use tempdir::TempDir;
 
@@ -46,4 +51,8 @@ pub fn make_flake_sandbox(path: &Path) -> Result<TempDir, io::Error> {
         .status()?;
 
     Ok(tmp_dir)
+}
+
+pub fn get_clobber_lock() -> Arc<Mutex<()>> {
+    return Arc::new(Mutex::new(()));
 }
