@@ -20,12 +20,12 @@ impl Display for SwitchToConfiguration {
 
 pub async fn wait_for_ping(ctx: &Context<'_>) -> Result<(), HiveLibError> {
     let host = ctx.node.target.get_preferred_host()?;
-    let mut result = ctx.node.ping(ctx.clobber_lock.clone()).await;
+    let mut result = ctx.node.ping(ctx.modifiers, ctx.clobber_lock.clone()).await;
 
     for num in 0..2 {
         warn!("Trying to ping {host} (attempt {}/3)", num + 1);
 
-        result = ctx.node.ping(ctx.clobber_lock.clone()).await;
+        result = ctx.node.ping(ctx.modifiers, ctx.clobber_lock.clone()).await;
 
         if result.is_ok() {
             info!("Regained connection to {} via {host}", ctx.name);

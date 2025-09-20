@@ -14,6 +14,7 @@ use tokio::{
 use tracing::{debug, trace};
 
 use crate::{
+    SubCommandModifiers,
     commands::{ChildOutputMode, WireCommand, WireCommandChip},
     errors::{CommandError, HiveLibError},
     hive::node::Target,
@@ -23,6 +24,7 @@ use crate::{
 pub(crate) struct NonInteractiveCommand<'t> {
     target: Option<&'t Target>,
     output_mode: Arc<ChildOutputMode>,
+    modifiers: SubCommandModifiers,
 }
 
 pub(crate) struct NonInteractiveChildChip {
@@ -42,12 +44,14 @@ impl<'t> WireCommand<'t> for NonInteractiveCommand<'t> {
     async fn spawn_new(
         target: Option<&'t Target>,
         output_mode: ChildOutputMode,
+        modifiers: SubCommandModifiers,
     ) -> Result<Self, crate::errors::HiveLibError> {
         let output_mode = Arc::new(output_mode);
 
         Ok(Self {
             target,
             output_mode,
+            modifiers,
         })
     }
 
@@ -59,7 +63,7 @@ impl<'t> WireCommand<'t> for NonInteractiveCommand<'t> {
         _clobber_lock: Arc<std::sync::Mutex<()>>,
     ) -> Result<Self::ChildChip, HiveLibError> {
         let mut command = if let Some(target) = self.target {
-            create_sync_ssh_command(target)?
+            create_sync_ssh_command(target, self.modifiers)?
         } else {
             let mut command = Command::new("sh");
 
@@ -105,13 +109,13 @@ impl<'t> WireCommand<'t> for NonInteractiveCommand<'t> {
             stderr_handle,
             self.output_mode.clone(),
             error_collection.clone(),
-            false,
+            true,
         ));
         joinset.spawn(handle_io(
             stdout_handle,
             self.output_mode.clone(),
             stdout_collection.clone(),
-            true,
+            false,
         ));
 
         Ok(NonInteractiveChildChip {
@@ -167,17 +171,16 @@ pub async fn handle_io<R>(
     reader: R,
     output_mode: Arc<ChildOutputMode>,
     collection: Arc<Mutex<VecDeque<String>>>,
-    always_collect: bool,
+    is_error: bool,
 ) where
     R: tokio::io::AsyncRead + Unpin,
 {
     let mut io_reader = tokio::io::AsyncBufReadExt::lines(BufReader::new(reader));
 
     while let Some(line) = io_reader.next_line().await.unwrap() {
-        trace!("Got line: {line:?}");
-        let log = output_mode.trace(line.clone());
+        let log = output_mode.trace(line.clone(), is_error);
 
-        if always_collect {
+        if !is_error {
             let mut queue = collection.lock().await;
             queue.push_front(line);
         } else if let Some(NixLog::Internal(log)) = log {
@@ -193,12 +196,11 @@ pub async fn handle_io<R>(
     debug!("io_handler: goodbye!");
 }
 
-fn create_sync_ssh_command(target: &Target) -> Result<Command, HiveLibError> {
+fn create_sync_ssh_command(
+    target: &Target,
+    modifiers: SubCommandModifiers,
+) -> Result<Command, HiveLibError> {
     let mut command = Command::new("ssh");
-
-    command.args(["-l", target.user.as_ref()]);
-    command.arg(target.get_preferred_host()?.as_ref());
-    command.args(["-p", &target.port.to_string()]);
-
+    command.args(target.create_ssh_args(modifiers)?);
     Ok(command)
 }

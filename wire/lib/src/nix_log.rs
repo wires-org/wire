@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt::{Debug, Display};
-use tracing::{Level as tracing_level, event, info};
+use tracing::{Level as tracing_level, error, event, info};
 
 // static DIGEST_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[0-9a-z]{32}").unwrap());
 
@@ -41,6 +41,7 @@ pub struct Internal {
 pub enum NixLog {
     Internal(Internal),
     Raw(String),
+    RawError(String),
 }
 
 pub(crate) trait Trace {
@@ -98,6 +99,7 @@ impl Trace for NixLog {
                 // );
             }
             NixLog::Raw(line) => info!("{line}"),
+            NixLog::RawError(line) => error!("{line}"),
         }
     }
 }
@@ -124,7 +126,7 @@ impl Display for NixLog {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             NixLog::Internal(line) => Display::fmt(&line, f),
-            NixLog::Raw(line) => Display::fmt(&line, f),
+            NixLog::Raw(line) | NixLog::RawError(line) => Display::fmt(&line, f),
         }
     }
 }

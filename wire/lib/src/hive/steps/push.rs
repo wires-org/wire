@@ -39,6 +39,7 @@ impl ExecuteStep for PushEvaluatedOutput {
             ctx.node,
             ctx.name,
             crate::hive::node::Push::Derivation(top_level),
+            ctx.modifiers,
             ctx.clobber_lock.clone()
         ).await.inspect_err(|_| {
                 if should_apply_locally(ctx.node.allow_local_deployment, &ctx.name.to_string()) {
@@ -78,6 +79,7 @@ impl ExecuteStep for PushBuildOutput {
             ctx.node,
             ctx.name,
             crate::hive::node::Push::Path(built_path),
+            ctx.modifiers,
             ctx.clobber_lock.clone(),
         )
         .await
