@@ -33,11 +33,14 @@ pub struct Cli {
     pub path: std::path::PathBuf,
 
     // Unused until a solution to tracing-indicatif log deadlocking is found...
-    /// Hide progress bars. Defaults to true if stdin does not refer to a tty (unix pipelines, in CI).
+    /// Hide progress bars.
+    ///
+    /// Defaults to true if stdin does not refer to a tty (unix pipelines, in CI).
     #[arg(long, global = true, default_value_t = !std::io::stdin().is_terminal())]
     pub no_progress: bool,
 
     /// Never accept user input.
+    ///
     /// Defaults to true if stdin does not refer to a tty (unix pipelines, in CI).
     #[arg(long, global = true, default_value_t = !std::io::stdin().is_terminal())]
     pub non_interactive: bool,
@@ -103,6 +106,13 @@ pub struct ApplyArgs {
     /// Reboot the nodes after activation
     #[arg(short, long, default_value_t = false)]
     pub reboot: bool,
+
+    /// Unconditionally accept SSH host keys [!!]
+    ///
+    /// Sets `StrictHostKeyChecking` to `no`.
+    /// Vulnerable to man-in-the-middle attacks, use with caution.
+    #[arg(long, default_value_t = false)]
+    pub ssh_accept_host: bool,
 }
 
 #[derive(Subcommand)]
@@ -181,6 +191,10 @@ impl ToSubCommandModifiers for Cli {
         SubCommandModifiers {
             show_trace: self.show_trace,
             non_interactive: self.non_interactive,
+            ssh_accept_host: match &self.command {
+                Commands::Apply(args) => args.ssh_accept_host,
+                _ => false,
+            },
         }
     }
 }

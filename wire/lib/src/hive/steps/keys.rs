@@ -263,6 +263,7 @@ impl ExecuteStep for PushKeyAgent {
                 ctx.node,
                 ctx.name,
                 Push::Path(&agent_directory),
+                ctx.modifiers,
                 ctx.clobber_lock.clone(),
             )
             .await?;

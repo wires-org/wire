@@ -24,6 +24,7 @@ pub mod errors;
 pub struct SubCommandModifiers {
     pub show_trace: bool,
     pub non_interactive: bool,
+    pub ssh_accept_host: bool,
 }
 
 pub enum EvalGoal<'a> {

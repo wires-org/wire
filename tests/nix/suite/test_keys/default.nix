@@ -12,7 +12,7 @@
       receiver_so = collect_store_objects(receiver)
 
       # build all nodes without any keys
-      deployer.succeed(f"wire apply --no-progress --on receiver --path {TEST_DIR}/hive.nix --no-keys -vvv >&2")
+      deployer.succeed(f"wire apply --no-progress --on receiver --path {TEST_DIR}/hive.nix --no-keys --ssh-accept-host -vvv >&2")
 
       receiver.wait_for_unit("sshd.service")
 
@@ -21,7 +21,7 @@
       deployer.fail("test -f /run/keys/source_string")
 
       def test_keys(target, target_object):
-          deployer.succeed(f"wire apply keys --on {target} --no-progress --path {TEST_DIR}/hive.nix -vvv >&2")
+          deployer.succeed(f"wire apply keys --on {target} --no-progress --path {TEST_DIR}/hive.nix --ssh-accept-host -vvv >&2")
 
           keys = [
             ("/run/keys/source_string", "hello_world_source", "root root 600"),

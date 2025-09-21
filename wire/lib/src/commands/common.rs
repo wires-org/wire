@@ -20,9 +20,11 @@ pub async fn push(
     node: &Node,
     name: &Name,
     push: Push<'_>,
+    modifiers: SubCommandModifiers,
     clobber_lock: Arc<Mutex<()>>,
 ) -> Result<(), HiveLibError> {
-    let mut command = NonInteractiveCommand::spawn_new(None, ChildOutputMode::Nix).await?;
+    let mut command =
+        NonInteractiveCommand::spawn_new(None, ChildOutputMode::Nix, modifiers).await?;
 
     let command_string = format!(
         "nix --extra-experimental-features nix-command \
@@ -38,7 +40,7 @@ pub async fn push(
     let child = command.run_command_with_env(
         command_string,
         false,
-        HashMap::from([("NIX_SSHOPTS".into(), format!("-p {}", node.target.port))]),
+        HashMap::from([("NIX_SSHOPTS".into(), node.target.create_ssh_opts(modifiers))]),
         clobber_lock,
     )?;
 
@@ -67,7 +69,8 @@ pub async fn evaluate_hive_attribute(
             HiveInitializationError::NoHiveFound(path.to_path_buf()),
         ))?;
 
-    let mut command = NonInteractiveCommand::spawn_new(None, ChildOutputMode::Nix).await?;
+    let mut command =
+        NonInteractiveCommand::spawn_new(None, ChildOutputMode::Nix, modifiers).await?;
     let attribute = if canon_path.ends_with("flake.nix") {
         format!(
             "{}#wire --apply \"hive: {}\"",
