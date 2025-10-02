@@ -33,12 +33,12 @@ pub(crate) async fn get_elevated_command(
 ) -> Result<Either<InteractiveCommand<'_>, NonInteractiveCommand<'_>>, HiveLibError> {
     if !modifiers.non_interactive {
         return Ok(Either::Left(
-            InteractiveCommand::spawn_new(target, output_mode).await?,
+            InteractiveCommand::spawn_new(target, output_mode, modifiers).await?,
         ));
     }
 
     return Ok(Either::Right(
-        NonInteractiveCommand::spawn_new(target, output_mode).await?,
+        NonInteractiveCommand::spawn_new(target, output_mode, modifiers).await?,
     ));
 }
 
@@ -48,6 +48,7 @@ pub(crate) trait WireCommand<'target>: Sized {
     async fn spawn_new(
         target: Option<&'target Target>,
         output_mode: ChildOutputMode,
+        modifiers: SubCommandModifiers,
     ) -> Result<Self, HiveLibError>;
 
     fn run_command<S: AsRef<str>>(
@@ -87,6 +88,7 @@ impl WireCommand<'_> for Either<InteractiveCommand<'_>, NonInteractiveCommand<'_
     async fn spawn_new(
         _target: Option<&'_ Target>,
         _output_mode: ChildOutputMode,
+        _modifiers: SubCommandModifiers,
     ) -> Result<Self, HiveLibError> {
         unimplemented!()
     }
@@ -128,13 +130,17 @@ impl WireCommandChip for Either<InteractiveChildChip, NonInteractiveChildChip> {
 }
 
 impl ChildOutputMode {
-    fn trace(self, line: String) -> Option<NixLog> {
+    fn trace(self, line: String, hint_error: bool) -> Option<NixLog> {
         let log = match self {
             ChildOutputMode::Nix => {
                 let log =
                     serde_json::from_str::<Internal>(line.strip_prefix("@nix ").unwrap_or(&line))
                         .map(NixLog::Internal)
-                        .unwrap_or(NixLog::Raw(line));
+                        .unwrap_or(if hint_error {
+                            NixLog::RawError(line)
+                        } else {
+                            NixLog::Raw(line)
+                        });
 
                 // Throw out stop logs
                 if let NixLog::Internal(Internal {
@@ -146,6 +152,7 @@ impl ChildOutputMode {
 
                 log
             }
+            Self::Raw if hint_error => NixLog::RawError(line),
             Self::Raw => NixLog::Raw(line),
         };
 

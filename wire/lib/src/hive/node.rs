@@ -34,6 +34,48 @@ pub struct Target {
     current_host: usize,
 }
 
+impl Target {
+    pub fn create_ssh_opts(&self, modifiers: SubCommandModifiers) -> String {
+        format!(
+            "-p {} {}",
+            self.port,
+            if modifiers.ssh_accept_host {
+                "-o StrictHostKeyChecking=no"
+            } else {
+                "-o StrictHostKeyChecking=accept-new"
+            }
+        )
+    }
+
+    pub fn create_ssh_args(
+        &self,
+        modifiers: SubCommandModifiers,
+    ) -> Result<Vec<String>, HiveLibError> {
+        let mut vector = vec![
+            "-l".to_string(),
+            self.user.to_string(),
+            self.get_preferred_host()?.to_string(),
+            "-p".to_string(),
+            self.port.to_string(),
+        ];
+
+        vector.extend([
+            "-o".to_string(),
+            format!(
+                "StrictHostKeyChecking {}",
+                if modifiers.ssh_accept_host {
+                    "no"
+                } else {
+                    "accept-new"
+                }
+            )
+            .to_string(),
+        ]);
+
+        Ok(vector)
+    }
+}
+
 #[cfg(test)]
 impl Default for Target {
     fn default() -> Self {
@@ -133,7 +175,11 @@ impl Node {
         }
     }
 
-    pub async fn ping(&self, clobber_lock: Arc<Mutex<()>>) -> Result<(), HiveLibError> {
+    pub async fn ping(
+        &self,
+        modifiers: SubCommandModifiers,
+        clobber_lock: Arc<Mutex<()>>,
+    ) -> Result<(), HiveLibError> {
         let host = self.target.get_preferred_host()?;
 
         let command_string = format!(
@@ -142,11 +188,12 @@ impl Node {
             self.target.user, host
         );
 
-        let mut command = NonInteractiveCommand::spawn_new(None, ChildOutputMode::Nix).await?;
+        let mut command =
+            NonInteractiveCommand::spawn_new(None, ChildOutputMode::Nix, modifiers).await?;
         let output = command.run_command_with_env(
             command_string,
             false,
-            HashMap::from([("NIX_SSHOPTS".into(), format!("-p {}", self.target.port))]),
+            HashMap::from([("NIX_SSHOPTS".into(), self.target.create_ssh_opts(modifiers))]),
             clobber_lock,
         )?;
 

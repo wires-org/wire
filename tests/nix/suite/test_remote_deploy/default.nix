@@ -10,8 +10,14 @@
       with subtest("Test unreachable hosts"):
         deployer.fail(f"wire apply --on receiver-unreachable --no-progress --path {TEST_DIR}/hive.nix --no-keys -vvv >&2")
 
+      with subtest("Test ssh host key logic"):
+        # ran without --ssh-accept-host, should fail because we have never seen this node before
+        deployer.fail(f"wire apply push --on receiver --no-progress --path {TEST_DIR}/hive.nix --no-keys -vvv >&2")
+        # ran --ssh-accept-host, should succeed
+        deployer.succeed(f"wire apply push --on receiver --no-progress --path {TEST_DIR}/hive.nix --no-keys --ssh-accept-host -vvv >&2")
+
       with subtest("Check basic apply"):
-          deployer.succeed(f"wire apply --on receiver --no-progress --path {TEST_DIR}/hive.nix --no-keys -vvv >&2")
+          deployer.succeed(f"wire apply --on receiver --no-progress --path {TEST_DIR}/hive.nix --no-keys --ssh-accept-host -vvv >&2")
 
           identity = receiver.succeed("cat /etc/identity")
           assert identity == "first", "Identity of first apply wasn't as expected"
@@ -19,7 +25,7 @@
       with subtest("Check boot apply"):
         first_system = receiver.succeed("readlink -f /run/current-system")
 
-        deployer.succeed(f"wire apply boot --on receiver-second --no-progress --path {TEST_DIR}/hive.nix --no-keys -vvv >&2")
+        deployer.succeed(f"wire apply boot --on receiver-second --no-progress --path {TEST_DIR}/hive.nix --no-keys --ssh-accept-host -vvv >&2")
 
         _first_system = receiver.succeed("readlink -f /run/current-system")
         assert first_system == _first_system, "apply boot without --reboot changed /run/current-system"
